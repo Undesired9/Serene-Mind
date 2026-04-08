@@ -4,6 +4,8 @@ import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import Reports from './components/Reports';
+import LandingPage from './components/landing/LandingPage';
 
 // A simple protective wrapper for authenticated routes
 const ProtectedRoute = ({ children }) => {
@@ -45,8 +47,14 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Redirect root to dashboard */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            <MainLayout><Reports /></MainLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
       </Routes>
     </BrowserRouter>
   );
