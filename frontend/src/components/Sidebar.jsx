@@ -34,12 +34,12 @@ const Sidebar = () => {
     };
 
     return (
-        <div className="w-64 h-screen bg-serene-card border-r border-slate-700/50 flex flex-col p-4 z-20 relative">
+        <div className="w-64 h-screen bg-transparent border-r border-slate-400/50 flex flex-col p-4 z-20 relative">
             <div className="flex items-center gap-3 mb-10 px-2 mt-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                <div className="w-8 h-8 rounded-lg bg-serene-accent flex items-center justify-center shadow-lg shadow-serene-accent/20">
-                    <span className="text-slate-900 font-bold">S</span>
+                <div className="w-8 h-8 rounded-lg bg-slate-400 flex items-center justify-center shadow-md shadow-slate-400/20">
+                    <span className="text-white font-bold">S</span>
                 </div>
-                <h1 className="text-xl font-bold tracking-tight text-white">SereneMind</h1>
+                <h1 className="text-xl font-bold tracking-tight text-slate-800">SereneMind</h1>
             </div>
             
             <nav className="flex-1 space-y-2">
@@ -49,12 +49,12 @@ const Sidebar = () => {
                 <NavItem icon={<Settings size={20}/>} label="Settings" active={location.pathname === '/settings'} />
             </nav>
             
-            <div className="mt-auto border-t border-slate-700/50 pt-4 space-y-2">
-                <button onClick={handleClearHistory} className="flex items-center gap-3 px-3 py-2 text-serene-muted hover:text-orange-400 transition-colors w-full rounded-lg hover:bg-slate-800/50">
+            <div className="mt-auto border-t border-slate-400/50 pt-4 space-y-2">
+                <button onClick={handleClearHistory} className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-orange-600 transition-colors w-full rounded-lg hover:bg-slate-200/50">
                     <Trash2 size={20}/>
                     <span className="text-sm">Clear History</span>
                 </button>
-                <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-serene-muted hover:text-red-400 transition-colors w-full rounded-lg hover:bg-slate-800/50">
+                <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-600 transition-colors w-full rounded-lg hover:bg-slate-200/50">
                     <LogOut size={20}/>
                     <span className="text-sm">End Session / Logout</span>
                 </button>
@@ -66,8 +66,8 @@ const Sidebar = () => {
 const NavItem = ({ icon, label, active, onClick }) => (
     <button onClick={onClick} className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all duration-200 ${
         active 
-            ? 'bg-serene-accent/10 text-serene-accent border border-serene-accent/20 shadow-sm' 
-            : 'text-serene-muted hover:bg-slate-800/50 hover:text-white'
+            ? 'bg-slate-300/50 text-slate-800 border border-slate-400/30 shadow-sm' 
+            : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-900'
     }`}>
         {icon}
         <span className="font-medium text-sm">{label}</span>

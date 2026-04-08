@@ -92,16 +92,16 @@ const ChatInterface = () => {
         <div className="flex-1 flex flex-col h-screen bg-serene-dark relative overflow-hidden">
             <SereneBlob isCrisis={isCrisis} isTyping={isTyping} />
             {/* Header */}
-            <header className="h-16 border-b border-slate-700/50 flex items-center justify-between px-6 bg-serene-card/50 backdrop-blur-md relative z-10">
+            <header className="h-16 border-b border-slate-400/50 flex items-center justify-between px-6 bg-transparent relative z-10">
                 <div className="flex items-center gap-3">
                     <div className="relative">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400 absolute -top-1 -right-1 animate-pulse"></div>
-                        <HeartPulse className="text-serene-accent" />
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-1 -right-1 animate-pulse"></div>
+                        <HeartPulse className="text-slate-600" />
                     </div>
                     <div>
-                        <h2 className="font-semibold tracking-wide flex items-center gap-2">
+                        <h2 className="font-semibold tracking-wide flex items-center gap-2 text-slate-800">
                             AI Therapist
-                            <span className="text-xs bg-slate-800 text-serene-muted px-2 py-0.5 rounded-full border border-slate-700 font-normal">Private & Secure</span>
+                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full border border-slate-400 font-normal">Private & Secure</span>
                         </h2>
                     </div>
                 </div>
@@ -145,8 +145,8 @@ const ChatInterface = () => {
                         >
                             <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] ${
                                 msg.sender === 'user' 
-                                    ? 'bg-serene-accent text-slate-900 rounded-tr-sm' 
-                                    : 'bg-serene-card border border-slate-700/50 rounded-tl-sm text-serene-text'
+                                    ? 'bg-slate-300 text-slate-900 rounded-tr-sm shadow-md shadow-slate-300/20' 
+                                    : 'bg-serene-card border border-slate-400 rounded-tl-sm text-slate-800'
                             } ${msg.isCrisisNote ? 'border-red-500/50 bg-red-900/20' : ''}`}>
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                                 <span className={`text-[10px] mt-2 block ${msg.sender === 'user' ? 'text-slate-700/80 font-medium' : 'text-slate-500'}`}>
@@ -157,10 +157,10 @@ const ChatInterface = () => {
                     ))}
                     {isTyping && (
                         <div className="flex justify-start">
-                            <div className="bg-serene-card border border-slate-700/50 rounded-2xl rounded-tl-sm px-5 py-4 flex gap-1.5 items-center">
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0 }} className="w-1.5 h-1.5 bg-serene-accent rounded-full"></motion.span>
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.2 }} className="w-1.5 h-1.5 bg-serene-accent rounded-full"></motion.span>
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.4 }} className="w-1.5 h-1.5 bg-serene-accent rounded-full"></motion.span>
+                            <div className="bg-serene-card border border-slate-400 rounded-2xl rounded-tl-sm px-5 py-4 flex gap-1.5 items-center">
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.2 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.4 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
                             </div>
                         </div>
                     )}
@@ -169,7 +169,7 @@ const ChatInterface = () => {
             </div>
 
             {/* Input Area */}
-            <div className="bg-serene-card/80 backdrop-blur-lg border-t border-slate-700/50 p-6 pt-5 relative z-10">
+            <div className="bg-transparent border-t border-slate-400/50 p-6 pt-5 relative z-10">
                 <form onSubmit={handleSend} className="max-w-4xl mx-auto flex gap-3 relative">
                     <input 
                         type="text" 
@@ -177,18 +177,18 @@ const ChatInterface = () => {
                         onChange={(e) => setInput(e.target.value)}
                         disabled={isCrisis}
                         placeholder={isCrisis ? "Chat disabled during emergency protocol." : "Type your message..."}
-                        className="flex-1 bg-[#151f32] text-white rounded-2xl px-5 py-4 focus:outline-none focus:ring-1 focus:ring-serene-accent/50 border border-slate-700/60 transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px]"
+                        className="flex-1 bg-slate-200 text-slate-800 placeholder-slate-500 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-slate-400 border border-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px]"
                         autoFocus
                     />
                     <button 
                         type="submit" 
                         disabled={!input.trim() || isCrisis}
-                        className="bg-serene-accent hover:bg-sky-300 text-slate-900 w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-serene-accent/20"
+                        className="bg-slate-500 hover:bg-slate-600 text-white w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-500/20"
                     >
                         <Send size={20} className={input.trim() ? "translate-x-0.5" : ""} />
                     </button>
                     {!isCrisis && (
-                         <div className="absolute -top-6 text-[11px] text-slate-500 flex items-center gap-1.5 left-2">
+                         <div className="absolute -top-6 text-[11px] text-slate-600 flex items-center gap-1.5 left-2">
                              <Infinity size={12}/> AI generations can be inaccurate. Never rely on this for an emergency.
                          </div>
                     )}

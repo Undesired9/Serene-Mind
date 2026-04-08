@@ -4,8 +4,22 @@
 
 @layer base {
   body {
-    @apply bg-serene-dark text-serene-text font-sans antialiased;
+    @apply font-sans antialiased;
+    background-color: #C1C1C4 !important;
+    color: #26272F;
   }
+}
+
+.bg-serene-dark,
+.bg-serene-card,
+.bg-\[\#151f32\],
+.bg-slate-800 {
+  background-color: #C1C1C4 !important;
+}
+
+/* Force all text to this color, except crisis/danger messages to fulfill user request */
+*:not([class*="text-red-"]) {
+  color: #26272F !important;
 }
 
 /* Custom scrollbar for chat */

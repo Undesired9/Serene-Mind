@@ -45,8 +45,8 @@ const Dashboard = () => {
         <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10">
             <header className="mb-10 max-w-6xl mx-auto flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Welcome back, {user.username}</h1>
-                    <p className="text-serene-muted">Here is an overview of your mental wellness journey.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">Welcome back, {user.username}</h1>
+                    <p className="text-slate-600">Here is an overview of your mental wellness journey.</p>
                 </div>
             </header>
 
@@ -58,9 +58,9 @@ const Dashboard = () => {
             </div>
 
             {/* Main Analytics Chart */}
-            <div className="bg-serene-card/80 backdrop-blur-md border border-slate-700/50 rounded-3xl p-6 w-full max-w-6xl mx-auto">
+            <div className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 w-full max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <Heart size={20} className="text-rose-400 animate-pulse" /> Daily Mood Trends
                     </h2>
                 </div>
@@ -73,14 +73,14 @@ const Dashboard = () => {
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={stats.trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis dataKey="name" stroke="#94a3b8" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} />
-                                <YAxis stroke="#94a3b8" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} domain={[0, 10]} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" vertical={false} />
+                                <XAxis dataKey="name" stroke="#64748b" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} />
+                                <YAxis stroke="#64748b" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} domain={[0, 10]} />
                                 <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#f8fafc' }}
-                                    itemStyle={{ color: '#7dd3fc' }}
+                                    contentStyle={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '12px', color: '#1e293b' }}
+                                    itemStyle={{ color: '#64748b' }}
                                 />
-                                <Line type="monotone" dataKey="mood" stroke="#38bdf8" strokeWidth={4} dot={{ r: 6, fill: '#0f172a', stroke: '#38bdf8', strokeWidth: 2 }} activeDot={{ r: 8 }} />
+                                <Line type="monotone" dataKey="mood" stroke="#94a3b8" strokeWidth={4} dot={{ r: 6, fill: '#f1f5f9', stroke: '#94a3b8', strokeWidth: 2 }} activeDot={{ r: 8 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -95,13 +95,13 @@ const Dashboard = () => {
 };
 
 const StatCard = ({ icon, title, value, desc, hoverColor }) => (
-    <div className="group bg-serene-card/80 backdrop-blur-md border border-slate-700/50 hover:border-slate-600 transition duration-300 rounded-3xl p-6 flex items-start gap-4 cursor-default">
-        <div className={`w-12 h-12 rounded-2xl bg-[#151f32] flex items-center justify-center shrink-0 shadow-inner border border-slate-800 transition-colors ${hoverColor}`}>
+    <div className="group bg-slate-200/50 backdrop-blur-md border border-slate-400 hover:border-slate-500 transition duration-300 rounded-3xl p-6 flex items-start gap-4 cursor-default">
+        <div className={`w-12 h-12 rounded-2xl bg-slate-300 flex items-center justify-center shrink-0 shadow-inner border border-slate-400 transition-colors ${hoverColor}`}>
             {icon}
         </div>
         <div>
-            <h3 className="text-serene-muted text-sm font-medium mb-1">{title}</h3>
-            <p className="text-2xl font-bold text-white tracking-tight mb-1">{value}</p>
+            <h3 className="text-slate-600 text-sm font-medium mb-1">{title}</h3>
+            <p className="text-2xl font-bold text-slate-800 tracking-tight mb-1">{value}</p>
             {desc && <p className="text-xs text-slate-500 font-medium">{desc}</p>}
         </div>
     </div>

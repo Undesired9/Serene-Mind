@@ -9,8 +9,8 @@ export default {
       colors: {
         serene: {
           dark: '#0f172a',
-          card: '#1e293b',
-          accent: '#7dd3fc', // Very soft airy blue for dark mode
+          card: '#C1C1C4',
+          accent: '#C1C1C4', // Very soft airy blue for dark mode
           text: '#f8fafc',
           muted: '#94a3b8'
         }
