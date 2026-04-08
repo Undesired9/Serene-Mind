@@ -12,26 +12,6 @@ const Sidebar = () => {
         navigate('/login');
     };
 
-    const handleClearHistory = async () => {
-        const token = localStorage.getItem('serene_token');
-        if (!token) return;
-
-        if(window.confirm("Are you sure you want to permanently delete your session history? This action cannot be reversed.")) {
-             try {
-                 const response = await fetch('http://localhost:5000/api/chat/history', {
-                     method: 'DELETE',
-                     headers: { 'Authorization': `Bearer ${token}` }
-                 });
-
-                 if(response.ok) {
-                     alert("Your history has been securely wiped.");
-                     window.location.reload();
-                 }
-             } catch(e) {
-                 console.error(e);
-             }
-        }
-    };
 
     return (
         <div className="w-64 h-screen bg-transparent border-r border-slate-400/50 flex flex-col p-4 z-20 relative">
@@ -45,15 +25,11 @@ const Sidebar = () => {
             <nav className="flex-1 space-y-2">
                 <NavItem icon={<Home size={20}/>} label="Dashboard" active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
                 <NavItem icon={<MessageSquare size={20}/>} label="Therapy Chat" active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
-                <NavItem icon={<Activity size={20}/>} label="Mood Tracking" active={location.pathname === '/mood'} />
-                <NavItem icon={<Settings size={20}/>} label="Settings" active={location.pathname === '/settings'} />
+                <NavItem icon={<Activity size={20}/>} label="Reports & Insights" active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
+                <NavItem icon={<Settings size={20}/>} label="Settings" active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
             </nav>
             
             <div className="mt-auto border-t border-slate-400/50 pt-4 space-y-2">
-                <button onClick={handleClearHistory} className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-orange-600 transition-colors w-full rounded-lg hover:bg-slate-200/50">
-                    <Trash2 size={20}/>
-                    <span className="text-sm">Clear History</span>
-                </button>
                 <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-600 transition-colors w-full rounded-lg hover:bg-slate-200/50">
                     <LogOut size={20}/>
                     <span className="text-sm">End Session / Logout</span>

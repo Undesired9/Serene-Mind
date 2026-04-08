@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Clock, Heart, Award, Bell, FileText, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
+import DailyCheckIn from './DailyCheckIn';
 
 const Dashboard = () => {
     const userDataObj = localStorage.getItem('serene_user');
@@ -16,36 +17,46 @@ const Dashboard = () => {
     });
     const [loading, setLoading] = useState(true);
 
-    // Mock Notifications Data
-    const [notifications, setNotifications] = useState([
-        { id: 1, title: 'Weekly Summary Available', description: 'Your mood insights for this week have been compiled.', date: '2 hours ago', unread: true },
-        { id: 2, title: 'Therapist Feedback', description: 'Dr. Smith has reviewed your latest journal entry.', date: 'Yesterday', unread: false },
-        { id: 3, title: 'Milestone Reached', description: 'Congratulations! You have logged 10 sessions.', date: '3 days ago', unread: false },
-    ]);
+    const [notifications, setNotifications] = useState([]);
+
+    const fetchStats = async () => {
+        try {
+            const token = localStorage.getItem('serene_token');
+            const response = await fetch('http://localhost:5000/api/dashboard/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setStats(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch stats', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchReports = async () => {
+        try {
+            const token = localStorage.getItem('serene_token');
+            const response = await fetch('http://localhost:5000/api/dashboard/reports', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                setNotifications(await response.json());
+            }
+        } catch (error) {
+            console.error('Failed to fetch reports', error);
+        }
+    };
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const token = localStorage.getItem('serene_token');
-                const response = await fetch('http://localhost:5000/api/dashboard/stats', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    setStats(data);
-                }
-            } catch (error) {
-                console.error('Failed to fetch stats', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchStats();
+        fetchReports();
     }, []);
 
     // Helper logic for realistic dashboard rendering
-    const consecutiveStreak = stats.totalMessages > 0 ? '5 Days' : '0 Days';
+    const consecutiveStreak = stats.activeDays ? `${stats.activeDays} Days` : '0 Days';
     const averageMoodDisplay = stats.totalMessages > 0 ? `${stats.moodScore} / 10` : '-- / 10';
     const sessionDescription = `${stats.totalMessages} total interactions`;
 
@@ -57,6 +68,8 @@ const Dashboard = () => {
                     <p className="text-slate-600">Here is an overview of your mental wellness journey.</p>
                 </div>
             </header>
+
+            <DailyCheckIn onMoodLogged={fetchStats} />
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 w-full max-w-6xl mx-auto">

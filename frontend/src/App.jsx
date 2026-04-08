@@ -5,13 +5,39 @@ import ChatInterface from './components/ChatInterface';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Reports from './components/Reports';
+import Settings from './components/Settings';
+import Assessment from './components/Assessment';
 import LandingPage from './components/landing/LandingPage';
 
-// A simple protective wrapper for authenticated routes
+// A protective wrapper that also enforces the Assessment requirement
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('serene_token');
-  if (!token) {
+  const userStr = localStorage.getItem('serene_user');
+  
+  if (!token || !userStr) {
     return <Navigate to="/login" replace />;
+  }
+
+  const user = JSON.parse(userStr);
+  
+  // Intercept and force assessment
+  if (user.needsAssessment) {
+    return <Navigate to="/assessment" replace />;
+  }
+
+  return children;
+};
+
+// Assessment Wrapper to prevent re-taking
+const AssessmentRoute = ({ children }) => {
+  const token = localStorage.getItem('serene_token');
+  const userStr = localStorage.getItem('serene_user');
+  
+  if (!token || !userStr) return <Navigate to="/login" replace />;
+  
+  const user = JSON.parse(userStr);
+  if (!user.needsAssessment) {
+      return <Navigate to="/dashboard" replace />;
   }
   return children;
 };
@@ -34,6 +60,11 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         
+        {/* Assessment Route */}
+        <Route path="/assessment" element={
+          <AssessmentRoute><Assessment /></AssessmentRoute>
+        } />
+        
         {/* Authenticated Layout */}
         <Route path="/chat" element={
           <ProtectedRoute>
@@ -50,6 +81,12 @@ function App() {
         <Route path="/reports" element={
           <ProtectedRoute>
             <MainLayout><Reports /></MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <MainLayout><Settings /></MainLayout>
           </ProtectedRoute>
         } />
 

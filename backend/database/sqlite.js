@@ -40,6 +40,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 date DATE DEFAULT CURRENT_DATE,
                 FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
             )`);
+
+            // Clinical Assessments (PHQ-9)
+            db.run(`CREATE TABLE IF NOT EXISTS Assessments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                q1 INTEGER, q2 INTEGER, q3 INTEGER, q4 INTEGER, q5 INTEGER,
+                q6 INTEGER, q7 INTEGER, q8 INTEGER, q9 INTEGER, q10 INTEGER,
+                total_score INTEGER NOT NULL,
+                severity TEXT NOT NULL,
+                crisis_risk BOOLEAN NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
         });
     }
 });

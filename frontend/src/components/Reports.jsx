@@ -1,15 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, ArrowLeft, Filter, Download, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Reports = () => {
-    const [reports, setReports] = useState([
-        { id: 1, title: 'Weekly Summary Available', description: 'Your mood insights for this week have been compiled.', date: '2 hours ago', unread: true, type: 'summary' },
-        { id: 2, title: 'Therapist Feedback', description: 'Dr. Smith has reviewed your latest journal entry. Focus was on anxiety management.', date: 'Yesterday', unread: false, type: 'feedback' },
-        { id: 3, title: 'Milestone Reached', description: 'Congratulations! You have logged 10 consecutive sessions.', date: '3 days ago', unread: false, type: 'milestone' },
-        { id: 4, title: 'Monthly Wellness Report', description: 'Your comprehensive wellness report for March is ready for review.', date: '1 week ago', unread: false, type: 'report' },
-        { id: 5, title: 'Coping Strategies Suggestion', description: 'Based on your recent distress signals, we have compiled a few coping strategy suggestions.', date: '2 weeks ago', unread: false, type: 'suggestion' },
-    ]);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchReports = async () => {
+             try {
+                 const token = localStorage.getItem('serene_token');
+                 const response = await fetch('http://localhost:5000/api/dashboard/reports', {
+                     headers: { 'Authorization': `Bearer ${token}` }
+                 });
+                 if (response.ok) {
+                     setReports(await response.json());
+                 }
+             } catch (error) {
+                 console.error("Failed to fetch reports:", error);
+             } finally {
+                 setLoading(false);
+             }
+        };
+        fetchReports();
+    }, []);
 
     return (
         <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10 flex flex-col items-center">
