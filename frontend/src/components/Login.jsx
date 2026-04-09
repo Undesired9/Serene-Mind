@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Sparkles, ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -41,7 +41,11 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-serene-dark flex items-center justify-center relative overflow-hidden">
+    <div className="h-screen w-full bg-serene-dark flex items-center justify-center relative overflow-hidden relative">
+      <Link to="/" className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors font-medium z-20 hover:scale-105 active:scale-95 bg-slate-200/50 hover:bg-slate-300/50 p-2 pr-4 rounded-xl backdrop-blur-sm border border-transparent hover:border-slate-300">
+          <ArrowLeft size={20} /> Back to Home
+      </Link>
+      
       {/* Soft Ambient Background specifically for login */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-slate-300/40 rounded-full blur-[120px] pointer-events-none"></div>
 

@@ -1,14 +1,103 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, HeartPulse, Infinity, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, HeartPulse, Infinity, AlertTriangle, Mic, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import SereneBlob from './SereneBlob';
 
 const ChatInterface = () => {
+    const { t, i18n } = useTranslation();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [isCrisis, setIsCrisis] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [voiceEnabled, setVoiceEnabled] = useState(true);
     const endOfMessagesRef = useRef(null);
+    const recognitionRef = useRef(null);
+    const isVoiceLockedRef = useRef(false); // Synchronous lock to prevent double firing
+
+    // Initialize Speech Recognition
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.interimResults = true;
+            
+            recognitionRef.current.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                setInput(transcript);
+            };
+            
+            recognitionRef.current.onerror = (event) => {
+                // Ignore no-speech and network errors which are common harmless aborts in Chrome Web Speech API
+                if (event.error !== 'no-speech' && event.error !== 'network') {
+                    console.error("Speech recognition error:", event.error);
+                }
+                setIsRecording(false);
+                isVoiceLockedRef.current = false;
+            };
+            
+            recognitionRef.current.onend = () => {
+                setIsRecording(false);
+                isVoiceLockedRef.current = false;
+            };
+        }
+    }, []);
+
+    // Play TTS
+    const speakText = useCallback((text) => {
+        if (!voiceEnabled || !window.speechSynthesis) return;
+        window.speechSynthesis.cancel(); // Stop current speaking
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = i18n.language; // Match TTS language to selected i18n
+        utterance.rate = 0.95; // slightly slower for therapist feel
+        utterance.pitch = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
+    }, [voiceEnabled, i18n.language]);
+
+    const toggleVoice = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        
+        if (isVoiceLockedRef.current) return;
+        
+        if (isRecording) {
+            handleVoiceEnd();
+        } else {
+            handleVoiceStart();
+        }
+    };
+
+    const handleVoiceStart = () => {
+        if (recognitionRef.current) {
+            try {
+                isVoiceLockedRef.current = true;
+                recognitionRef.current.lang = i18n.language; // set to current language
+                recognitionRef.current.start();
+                setIsRecording(true);
+                setInput('');
+            } catch (error) {
+                // Ignore InvalidStateError if it's already started
+                isVoiceLockedRef.current = false;
+                if (error.name !== 'InvalidStateError') {
+                    console.error('Speech start error:', error);
+                }
+            }
+        } else {
+            alert("Your browser does not support Voice Recognition. Try Google Chrome.");
+        }
+    };
+
+    const handleVoiceEnd = () => {
+        if (recognitionRef.current && isRecording) {
+            recognitionRef.current.stop();
+            setIsRecording(false);
+        }
+    };
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -74,13 +163,18 @@ const ChatInterface = () => {
                 setIsCrisis(true);
             }
 
+            const replyText = data.reply;
             setMessages(prev => [...prev, {
                 id: Date.now(),
-                text: data.reply,
+                text: replyText,
                 sender: 'ai',
                 timestamp: new Date(),
                 isCrisisNote: data.isCrisis
             }]);
+
+            if (!data.isCrisis) {
+                speakText(replyText);
+            }
             
         } catch (error) {
             console.error('Error sending message:', error);
@@ -100,11 +194,23 @@ const ChatInterface = () => {
                     </div>
                     <div>
                         <h2 className="font-semibold tracking-wide flex items-center gap-2 text-slate-800">
-                            AI Therapist
-                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full border border-slate-400 font-normal">Private & Secure</span>
+                            AI Therapist 
+                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full border border-slate-400 font-normal">{t('chat_private')}</span>
                         </h2>
                     </div>
                 </div>
+                {/* Voice Controls */}
+                <button 
+                    onClick={() => {
+                        setVoiceEnabled(!voiceEnabled);
+                        if(voiceEnabled) window.speechSynthesis?.cancel(); // Mute immediately
+                    }}
+                    className={`p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm ${voiceEnabled ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200' : 'bg-slate-200 text-slate-500 hover:bg-slate-300 border border-slate-300'}`}
+                    title={voiceEnabled ? "Mute AI Therapist" : "Unmute AI Therapist"}
+                >
+                    {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                    <span className="text-xs font-bold hidden sm:inline">{voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+                </button>
             </header>
 
             {/* Crisis Overlay */}
@@ -176,10 +282,19 @@ const ChatInterface = () => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         disabled={isCrisis}
-                        placeholder={isCrisis ? "Chat disabled during emergency protocol." : "Type your message..."}
-                        className="flex-1 bg-slate-200 text-slate-800 placeholder-slate-500 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-slate-400 border border-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px]"
+                        placeholder={isCrisis ? "Chat disabled during emergency protocol." : (isRecording ? "Listening..." : t('chat_placeholder'))}
+                        className={`flex-1 bg-slate-200 text-slate-800 placeholder-slate-500 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-slate-400 border transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px] ${isRecording ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50/50' : 'border-slate-300'}`}
                         autoFocus
                     />
+                    <button 
+                        type="button"
+                        onClick={toggleVoice}
+                        disabled={isCrisis}
+                        className={`w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' : 'bg-slate-300 hover:bg-slate-400 text-slate-600 shadow-slate-400/20'}`}
+                        title={isRecording ? "Click to stop recording" : "Click to start recording"}
+                    >
+                        <Mic size={20} className={isRecording ? "scale-110" : ""} />
+                    </button>
                     <button 
                         type="submit" 
                         disabled={!input.trim() || isCrisis}

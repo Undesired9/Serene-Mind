@@ -1,8 +1,10 @@
 import React from 'react';
 import { Home, MessageSquare, Activity, Settings, LogOut, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const Sidebar = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -23,16 +25,16 @@ const Sidebar = () => {
             </div>
             
             <nav className="flex-1 space-y-2">
-                <NavItem icon={<Home size={20}/>} label="Dashboard" active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
-                <NavItem icon={<MessageSquare size={20}/>} label="Therapy Chat" active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
-                <NavItem icon={<Activity size={20}/>} label="Reports & Insights" active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
-                <NavItem icon={<Settings size={20}/>} label="Settings" active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
+                <NavItem icon={<Home size={20}/>} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
+                <NavItem icon={<MessageSquare size={20}/>} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
+                <NavItem icon={<Activity size={20}/>} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
+                <NavItem icon={<Settings size={20}/>} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
             </nav>
             
             <div className="mt-auto border-t border-slate-400/50 pt-4 space-y-2">
                 <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-600 transition-colors w-full rounded-lg hover:bg-slate-200/50">
                     <LogOut size={20}/>
-                    <span className="text-sm">End Session / Logout</span>
+                    <span className="text-sm">{t('nav_logout')}</span>
                 </button>
             </div>
         </div>

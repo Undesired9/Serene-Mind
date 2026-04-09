@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Clock, Heart, Award, Bell, FileText, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import DailyCheckIn from './DailyCheckIn';
 
 const Dashboard = () => {
+    const { t } = useTranslation();
     const userDataObj = localStorage.getItem('serene_user');
     const user = userDataObj ? JSON.parse(userDataObj) : { username: 'Guest' };
 
@@ -64,7 +66,7 @@ const Dashboard = () => {
         <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10">
             <header className="mb-10 max-w-6xl mx-auto flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">Welcome back, {user.username}</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">{t('dash_welcome')}, {user.username}</h1>
                     <p className="text-slate-600">Here is an overview of your mental wellness journey.</p>
                 </div>
             </header>
@@ -73,16 +75,16 @@ const Dashboard = () => {
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 w-full max-w-6xl mx-auto">
-                <StatCard icon={<Activity className="text-serene-accent"/>} title="Average Mood" value={averageMoodDisplay} hoverColor="group-hover:text-serene-accent" />
-                <StatCard icon={<Clock className="text-purple-400"/>} title="Total Sessions" value={stats.totalSessions} desc={sessionDescription} hoverColor="group-hover:text-purple-400" />
-                <StatCard icon={<Award className="text-emerald-400"/>} title="Current Streak" value={consecutiveStreak} desc="Consistent check-ins" hoverColor="group-hover:text-emerald-400" />
+                <StatCard icon={<Activity className="text-serene-accent"/>} title={t('dash_avg_mood')} value={averageMoodDisplay} hoverColor="group-hover:text-serene-accent" />
+                <StatCard icon={<Clock className="text-purple-400"/>} title={t('dash_total_sessions')} value={stats.totalSessions} desc={sessionDescription} hoverColor="group-hover:text-purple-400" />
+                <StatCard icon={<Award className="text-emerald-400"/>} title={t('dash_streak')} value={consecutiveStreak} hoverColor="group-hover:text-emerald-400" />
             </div>
 
             {/* Main Analytics Chart */}
             <div className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 w-full max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <Heart size={20} className="text-rose-400 animate-pulse" /> Daily Mood Trends
+                        <Heart size={20} className="text-rose-400 animate-pulse" /> {t('dash_mood_trends')}
                     </h2>
                 </div>
                 
@@ -116,7 +118,7 @@ const Dashboard = () => {
             <div className="w-full max-w-6xl mx-auto mt-8 mb-10">
                 <div className="flex items-center justify-between mb-6 px-1">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <Bell size={20} className="text-amber-500 hover:animate-bounce" /> Report Notifications
+                        <Bell size={20} className="text-amber-500 hover:animate-bounce" /> {t('dash_reports')}
                     </h2>
                     <span className="text-sm font-medium text-amber-600 bg-amber-100/80 px-3 py-1 rounded-full shadow-sm">
                         {notifications.filter(n => n.unread).length} New
@@ -143,7 +145,7 @@ const Dashboard = () => {
                 
                 <div className="mt-8 flex justify-center">
                     <Link to="/reports" className="group flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-800 transition-colors py-2.5 px-5 border border-slate-300 hover:border-slate-400 rounded-xl bg-slate-200/30 hover:bg-slate-300/50 shadow-sm">
-                        View All Reports <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                        {t('dash_view_all')} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
                 </div>
             </div>

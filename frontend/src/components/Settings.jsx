@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Trash2, ArrowLeft, Shield, AlertOctagon } from 'lucide-react';
+import { Settings as SettingsIcon, Trash2, ArrowLeft, Shield, AlertOctagon, Globe } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const Settings = () => {
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const userDataObj = localStorage.getItem('serene_user');
     const user = userDataObj ? JSON.parse(userDataObj) : { username: 'User', email: 'user@example.com' };
@@ -77,8 +79,8 @@ const Settings = () => {
                         <SettingsIcon size={22} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-800 leading-none">Settings & Privacy</h1>
-                        <p className="text-slate-500 text-sm mt-1">Manage your account and data autonomy.</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-800 leading-none">{t('settings_title')}</h1>
+                        <p className="text-slate-500 text-sm mt-1">{t('settings_desc')}</p>
                     </div>
                 </header>
 
@@ -89,17 +91,38 @@ const Settings = () => {
                 )}
 
                 <div className="space-y-6">
+                    {/* Language Settings */}
+                    <section className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 lg:p-8">
+                        <div className="flex items-center gap-3 mb-6 px-1 border-b border-transparent">
+                            <Globe className="text-blue-500" size={24} />
+                            <h2 className="text-xl font-bold text-slate-800">{t('settings_language')}</h2>
+                        </div>
+                        <div className="px-1">
+                            <select 
+                                className="w-full md:w-64 bg-white/80 border border-slate-300 rounded-xl px-4 py-3 text-slate-700 font-medium focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer"
+                                value={i18n.language}
+                                onChange={(e) => i18n.changeLanguage(e.target.value)}
+                            >
+                                <option value="en">English (US)</option>
+                                <option value="es">Español (ES)</option>
+                                <option value="fr">Français (FR)</option>
+                                <option value="ur">اردو (UR)</option>
+                                <option value="ar">العربية (AR)</option>
+                            </select>
+                        </div>
+                    </section>
+
                     {/* Account Details */}
                     <section className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 lg:p-8">
-                        <h2 className="text-xl font-bold text-slate-800 mb-6 px-1 border-b border-transparent">Account Information</h2>
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 px-1 border-b border-transparent">{t('settings_account_info')}</h2>
                         
                         <div className="flex flex-col gap-5 px-1">
                             <div>
-                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Username</label>
+                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{t('settings_username')}</label>
                                 <div className="bg-white/50 border border-slate-300 rounded-xl px-4 py-3 text-slate-700">{user.username}</div>
                             </div>
                             <div>
-                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Email Address</label>
+                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{t('settings_email')}</label>
                                 <div className="bg-white/50 border border-slate-300 rounded-xl px-4 py-3 text-slate-700">{user.email}</div>
                             </div>
                         </div>
@@ -109,21 +132,21 @@ const Settings = () => {
                     <section className="bg-red-50/50 backdrop-blur-md border border-red-200 rounded-3xl p-6 lg:p-8">
                         <div className="flex items-center gap-3 mb-6 px-1">
                             <Shield className="text-red-500" size={24} />
-                            <h2 className="text-xl font-bold text-slate-800">Data Autonomy & Deletion</h2>
+                            <h2 className="text-xl font-bold text-slate-800">{t('settings_data')}</h2>
                         </div>
                         
                         <div className="space-y-6 px-1">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 hover:border-red-300 transition-colors">
                                 <div>
-                                    <h3 className="font-bold text-slate-800">Clear Chat History</h3>
-                                    <p className="text-sm text-slate-500 mt-1 max-w-md">Erase all past conversations with the AI Therapist. This action cannot be undone and will affect your mood trends.</p>
+                                    <h3 className="font-bold text-slate-800">{t('settings_clear_history')}</h3>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-md">Erase all past conversations with the AI Therapist. This action cannot be undone.</p>
                                 </div>
                                 <button 
                                     onClick={handleClearHistory}
                                     disabled={isClearing}
                                     className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-sm transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                                 >
-                                    <Trash2 size={16} /> {isClearing ? 'Clearing...' : 'Clear History'}
+                                    <Trash2 size={16} /> {isClearing ? '...' : t('settings_clear_history')}
                                 </button>
                             </div>
 
@@ -131,16 +154,16 @@ const Settings = () => {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <AlertOctagon size={18} className="text-red-600" />
-                                        <h3 className="font-bold text-red-900">Delete Account</h3>
+                                        <h3 className="font-bold text-red-900">{t('settings_delete_account')}</h3>
                                     </div>
-                                    <p className="text-sm text-red-700 mt-1 max-w-md">Permanently delete your SereneMind account and all associated personal data from our servers.</p>
+                                    <p className="text-sm text-red-700 mt-1 max-w-md">Permanently delete your SereneMind account and all associated personal data.</p>
                                 </div>
                                 <button 
                                     onClick={handleDeleteAccount}
                                     disabled={isDeleting}
                                     className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm shadow shadow-red-500/20 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                                 >
-                                    {isDeleting ? 'Erasing Data...' : 'Delete Account'}
+                                    {isDeleting ? '...' : t('settings_delete_account')}
                                 </button>
                             </div>
                         </div>
