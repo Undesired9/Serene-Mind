@@ -8,6 +8,7 @@ import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Assessment from './components/Assessment';
 import LandingPage from './components/landing/LandingPage';
+import DoctorDashboard from './components/DoctorDashboard';
 
 // A protective wrapper that also enforces the Assessment requirement
 const ProtectedRoute = ({ children }) => {
@@ -87,6 +88,12 @@ function App() {
         <Route path="/settings" element={
           <ProtectedRoute>
             <MainLayout><Settings /></MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/doctor" element={
+          <ProtectedRoute>
+            <MainLayout><DoctorDashboard /></MainLayout>
           </ProtectedRoute>
         } />
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, MessageSquare, Activity, Settings, LogOut, Trash2 } from 'lucide-react';
+import { Home, MessageSquare, Activity, Settings, LogOut, Trash2, HeartPulse } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +28,7 @@ const Sidebar = () => {
                 <NavItem icon={<Home size={20}/>} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
                 <NavItem icon={<MessageSquare size={20}/>} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
                 <NavItem icon={<Activity size={20}/>} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
+                <NavItem icon={<HeartPulse size={20}/>} label={t('nav_doctor_view')} active={location.pathname === '/doctor'} onClick={() => navigate('/doctor')} />
                 <NavItem icon={<Settings size={20}/>} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
             </nav>
             
