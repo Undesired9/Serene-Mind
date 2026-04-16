@@ -6,6 +6,7 @@ require('dotenv').config();
 require('./database/sqlite');
 
 const authRoutes = require('./routes/auth');
+const doctorAuthRoutes = require('./routes/doctorAuth');
 const chatRoutes = require('./routes/chat');
 const dashboardRoutes = require('./routes/dashboard');
 const doctorRoutes = require('./routes/doctor');
@@ -23,6 +24,7 @@ app.get('/', (req, res) => {
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/doctor-auth', doctorAuthRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/doctor', doctorRoutes);

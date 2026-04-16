@@ -8,6 +8,10 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
+    const userStr = localStorage.getItem('serene_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const isDoctor = user && user.role === 'doctor';
+
     const handleLogout = () => {
         localStorage.removeItem('serene_token');
         localStorage.removeItem('serene_user');
@@ -25,10 +29,10 @@ const Sidebar = () => {
             </div>
             
             <nav className="flex-1 space-y-2">
-                <NavItem icon={<Home size={20}/>} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
-                <NavItem icon={<MessageSquare size={20}/>} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
-                <NavItem icon={<Activity size={20}/>} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
-                <NavItem icon={<HeartPulse size={20}/>} label={t('nav_doctor_view')} active={location.pathname === '/doctor'} onClick={() => navigate('/doctor')} />
+                {!isDoctor && <NavItem icon={<Home size={20}/>} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />}
+                {!isDoctor && <NavItem icon={<MessageSquare size={20}/>} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />}
+                {!isDoctor && <NavItem icon={<Activity size={20}/>} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />}
+                {isDoctor && <NavItem icon={<HeartPulse size={20}/>} label={t('nav_doctor_view')} active={location.pathname === '/doctor'} onClick={() => navigate('/doctor')} />}
                 <NavItem icon={<Settings size={20}/>} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
             </nav>
             

@@ -11,7 +11,7 @@ import LandingPage from './components/landing/LandingPage';
 import DoctorDashboard from './components/DoctorDashboard';
 
 // A protective wrapper that also enforces the Assessment requirement
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requireRole }) => {
   const token = localStorage.getItem('serene_token');
   const userStr = localStorage.getItem('serene_user');
   
@@ -21,8 +21,12 @@ const ProtectedRoute = ({ children }) => {
 
   const user = JSON.parse(userStr);
   
+  if (requireRole && user.role !== requireRole) {
+      return <Navigate to={user.role === 'doctor' ? '/doctor' : '/dashboard'} replace />;
+  }
+
   // Intercept and force assessment
-  if (user.needsAssessment) {
+  if (user.role !== 'doctor' && user.needsAssessment) {
     return <Navigate to="/assessment" replace />;
   }
 
@@ -37,6 +41,11 @@ const AssessmentRoute = ({ children }) => {
   if (!token || !userStr) return <Navigate to="/login" replace />;
   
   const user = JSON.parse(userStr);
+  
+  if (user.role === 'doctor') {
+      return <Navigate to="/doctor" replace />;
+  }
+  
   if (!user.needsAssessment) {
       return <Navigate to="/dashboard" replace />;
   }
@@ -74,7 +83,7 @@ function App() {
         } />
         
         <Route path="/dashboard" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireRole="patient">
             <MainLayout><Dashboard /></MainLayout>
           </ProtectedRoute>
         } />
@@ -92,7 +101,7 @@ function App() {
         } />
 
         <Route path="/doctor" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireRole="doctor">
             <MainLayout><DoctorDashboard /></MainLayout>
           </ProtectedRoute>
         } />
