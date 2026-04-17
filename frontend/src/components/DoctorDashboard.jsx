@@ -57,11 +57,11 @@ const DoctorDashboard = () => {
         <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10">
             <header className="mb-10 max-w-6xl mx-auto flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">Dashboard</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">Doctor View</h1>
                     <p className="text-slate-600">Overview of all active patients and their mental wellness reports.</p>
                 </div>
                 <div className="bg-slate-300 text-slate-700 px-4 py-2 rounded-xl border border-slate-400 font-medium flex items-center gap-2 shadow-sm">
-                    <Users size={18} /> {patients.length} Active Patients
+                    <Users size={18}/> {patients.length} Active Patients
                 </div>
             </header>
 
@@ -72,14 +72,14 @@ const DoctorDashboard = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 w-full max-w-6xl mx-auto">
                     {patients.map(patient => (
-                        <div
-                            key={patient.id}
+                        <div 
+                            key={patient.id} 
                             onClick={() => handlePatientClick(patient.id)}
                             className="bg-slate-200/50 backdrop-blur-md border border-slate-400 hover:border-slate-500 transition-all duration-300 rounded-3xl p-6 cursor-pointer group hover:shadow-lg relative overflow-hidden"
                         >
                             {patient.crisis_risk && (
                                 <div className="absolute top-0 right-0 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm flex items-center gap-1 z-10 animate-pulse">
-                                    <AlertTriangle size={12} /> High Risk
+                                    <AlertTriangle size={12}/> High Risk
                                 </div>
                             )}
                             <div className="flex items-start gap-4 mb-4">
@@ -97,9 +97,10 @@ const DoctorDashboard = () => {
                             <div className="space-y-2 mt-4">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">PHQ-9 Severity</span>
-                                    <span className={`font-semibold ${patient.severity && patient.severity.toLowerCase().includes('severe') ? 'text-rose-600' :
+                                    <span className={`font-semibold ${
+                                        patient.severity && patient.severity.toLowerCase().includes('severe') ? 'text-rose-600' : 
                                         patient.severity && patient.severity.toLowerCase().includes('moderate') ? 'text-amber-600' : 'text-emerald-600'
-                                        }`}>
+                                    }`}>
                                         {patient.severity || 'Unknown'}
                                     </span>
                                 </div>
@@ -108,13 +109,13 @@ const DoctorDashboard = () => {
                                     <span className="font-semibold text-slate-700">{patient.avg_mood ? `${patient.avg_mood}/10` : 'None'}</span>
                                 </div>
                             </div>
-
+                            
                             <div className="mt-6 pt-4 border-t border-slate-300/50 flex justify-between items-center">
                                 <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                    <Clock size={12} /> Joined {new Date(patient.created_at).toLocaleDateString()}
+                                    <Clock size={12}/> Joined {new Date(patient.created_at).toLocaleDateString()}
                                 </span>
                                 <div className="p-1.5 rounded-full bg-slate-300 text-slate-500 group-hover:bg-serene-accent group-hover:text-white transition-colors">
-                                    <ChevronRight size={16} />
+                                    <ChevronRight size={16}/>
                                 </div>
                             </div>
                         </div>
@@ -128,13 +129,13 @@ const DoctorDashboard = () => {
                     <div className="bg-slate-100 border border-slate-300 w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-6 py-4 border-b border-slate-300 flex items-center justify-between bg-slate-200/50">
                             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                <FileText className="text-serene-accent" size={24} /> Patient Report Detail
+                                <FileText className="text-serene-accent" size={24}/> Patient Report Detail
                             </h2>
                             <button onClick={closeModal} className="p-2 rounded-full hover:bg-slate-300 text-slate-500 transition-colors">
-                                <X size={20} />
+                                <X size={20}/>
                             </button>
                         </div>
-
+                        
                         <div className="p-6 overflow-y-auto flex-1">
                             {detailsLoading ? (
                                 <div className="h-64 flex items-center justify-center">
@@ -172,7 +173,7 @@ const DoctorDashboard = () => {
                                                     </div>
                                                     {patientDetails.assessment.crisis_risk && (
                                                         <div className="col-span-2 mt-2 bg-rose-50 text-rose-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 border border-rose-100">
-                                                            <AlertTriangle size={16} /> Indicates crisis / self-harm risk.
+                                                            <AlertTriangle size={16}/> Indicates crisis / self-harm risk.
                                                         </div>
                                                     )}
                                                 </div>
@@ -185,7 +186,7 @@ const DoctorDashboard = () => {
                                     {/* Mood Logs */}
                                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                         <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
-                                            <Heart className="text-rose-400" size={18} /> Recent Mood Logs
+                                            <Heart className="text-rose-400" size={18}/> Recent Mood Logs
                                         </h3>
                                         {patientDetails.mood_logs.length > 0 ? (
                                             <div className="space-y-3">
@@ -209,7 +210,7 @@ const DoctorDashboard = () => {
                                     {/* Session History (Risk overview) */}
                                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                         <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
-                                            <MessageSquare className="text-purple-400" size={18} /> Chat Interactions Overview
+                                            <MessageSquare className="text-purple-400" size={18}/> Chat Interactions Overview
                                         </h3>
                                         <div className="text-sm text-slate-500 mb-4">Note: Content is hidden for privacy. Risk levels are indicated.</div>
                                         {patientDetails.sessions.length > 0 ? (

@@ -20,15 +20,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
 
-            // Doctors Table
-            db.run(`CREATE TABLE IF NOT EXISTS Doctors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )`);
-
             // Sessions / Chat Logs
             db.run(`CREATE TABLE IF NOT EXISTS Sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

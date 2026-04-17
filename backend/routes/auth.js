@@ -28,11 +28,11 @@ router.post('/register', (req, res) => {
         }
         
         // Auto login on register, explicitly setting needsAssessment to true
-        const token = jwt.sign({ id: this.lastID, username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: this.lastID, username }, JWT_SECRET, { expiresIn: '7d' });
         res.status(201).json({
             message: 'User created successfully',
             token,
-            user: { id: this.lastID, username, email, needsAssessment: true, role: 'patient' }
+            user: { id: this.lastID, username, email, needsAssessment: true }
         });
     });
 });
@@ -58,7 +58,7 @@ router.post('/login', (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        const token = jwt.sign({ id: user.id, username: user.username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
         
         // Check if user has completed the assessment
         db.get(`SELECT id FROM Assessments WHERE user_id = ?`, [user.id], (err, assessment) => {
@@ -71,8 +71,7 @@ router.post('/login', (req, res) => {
                     id: user.id, 
                     username: user.username, 
                     email: user.email,
-                    needsAssessment: !assessment, // true if no assessment found
-                    role: 'patient'
+                    needsAssessment: !assessment // true if no assessment found
                 }
             });
         });
