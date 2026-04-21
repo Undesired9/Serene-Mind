@@ -10,6 +10,7 @@ const doctorAuthRoutes = require('./routes/doctorAuth');
 const chatRoutes = require('./routes/chat');
 const dashboardRoutes = require('./routes/dashboard');
 const doctorRoutes = require('./routes/doctor');
+const reportsRoutes = require('./routes/reports');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,7 @@ app.use('/api/doctor-auth', doctorAuthRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/doctor', doctorRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

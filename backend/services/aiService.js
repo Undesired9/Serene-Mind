@@ -60,7 +60,24 @@ const handleChat = async (message, history) => {
     };
 };
 
+const generatePatientReportMock = async (patient, moodLogs, recentSessions) => {
+    // Simulate AI parsing data and writing a report
+    const simulatedDelay = Math.floor(Math.random() * 2000) + 1500; // 1.5s to 3.5s delay
+    await delay(simulatedDelay);
+    
+    // Simple rule-based mock template for AI report
+    const aiInsight = "Patient has been experiencing fluctuating moods. " +
+        (moodLogs.length > 0 ? `Recent average mood is roughly ${Math.round(moodLogs.reduce((acc, log) => acc + log.mood_score, 0) / moodLogs.length)}/10. ` : "No mood logs available for analysis. ") +
+        (recentSessions.some(s => s.risk_level === 'HIGH') ? "There are indications of high-stress scenarios needing immediate doctor review. " : "General conversational patterns appear stable. ");
+
+    return {
+        title: `AI Wellness Summary for ${patient.username}`,
+        content: `Based on automated analysis of recent chat interactions and mood logs:\n\n${aiInsight}\n\nRecommended Action: Doctor to review the latest sessions and provide a follow-up assessment.`
+    };
+};
+
 module.exports = {
     handleChat,
-    detectRisk
+    detectRisk,
+    generatePatientReportMock
 };
