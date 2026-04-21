@@ -53,6 +53,18 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
             )`);
+
+            // Patient Reports Database (AI Generated, Doctor Reviewed)
+            db.run(`CREATE TABLE IF NOT EXISTS Patient_Reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                report_title TEXT NOT NULL,
+                report_content TEXT NOT NULL,
+                doctor_comments TEXT,
+                is_reviewed BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
         });
     }
 });
