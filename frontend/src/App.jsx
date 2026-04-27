@@ -92,9 +92,9 @@ function App() {
         } />
 
         <Route path="/doctor" element={
-          <ProtectedRoute>
+          <DoctorRoute>
             <MainLayout><DoctorDashboard /></MainLayout>
-          </ProtectedRoute>
+          </DoctorRoute>
         } />
 
         {/* Landing Page */}
