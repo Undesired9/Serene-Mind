@@ -64,21 +64,21 @@ const steps = [
     icon: <UserPlus size={24} />,
     title: 'Create Your Safe Space',
     desc: 'Register in seconds. Your account is encrypted end-to-end. We never sell or share your personal information — ever.',
-    color: '#3b82f6',
+    color: '#1B98E0',
   },
   {
     number: '02',
     icon: <MessageCircle size={24} />,
     title: 'Talk to Your AI Therapist',
     desc: 'Begin an evidence-based conversation. SereneMind uses CBT techniques, active listening, and personalised prompts calibrated to your emotional state.',
-    color: '#8b5cf6',
+    color: '#0E7C7B',
   },
   {
     number: '03',
     icon: <TrendingUp size={24} />,
     title: 'Track Your Progress',
     desc: 'Visualise your mood trends, streak insights, and session history on a beautiful analytics dashboard. Watch yourself grow.',
-    color: '#10b981',
+    color: '#1B98E0',
   },
 ];
 
@@ -91,8 +91,8 @@ const HowItWorksSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section id="how-it-works" ref={ref} className="py-28 bg-land-soft relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-gradient-to-b from-blue-50 to-transparent rounded-full blur-[80px] opacity-60 pointer-events-none" />
+    <section id="how-it-works" ref={ref} className="py-28 bg-[#C2FFF0]/30 relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-gradient-to-b from-[#C2FFF0]/50 to-transparent rounded-full blur-[80px] opacity-60 pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div
@@ -101,16 +101,16 @@ const HowItWorksSection = () => {
           transition={{ duration: 0.7 }}
           className="text-center mb-20"
         >
-          <span className="inline-flex items-center gap-2 bg-white border border-land-border text-land-primary text-sm font-semibold px-4 py-1.5 rounded-full mb-5 shadow-sm">
+          <span className="inline-flex items-center gap-2 bg-white border border-[#0E7C7B]/15 text-[#0E7C7B] text-sm font-semibold px-4 py-1.5 rounded-full mb-5 shadow-sm">
             Simple 3-Step Process
           </span>
-          <h2 className="text-4xl md:text-5xl font-black text-land-ink mb-5 leading-tight">
+          <h2 className="text-4xl md:text-5xl font-black text-[#0D1B2A] mb-5 leading-tight">
             Start feeling better{' '}
-            <span className="bg-gradient-to-r from-land-primary to-land-secondary bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#1B98E0] to-[#0E7C7B] bg-clip-text text-transparent">
               in minutes
             </span>
           </h2>
-          <p className="text-land-muted text-lg max-w-xl mx-auto">
+          <p className="text-[#3D5A80] text-lg max-w-xl mx-auto">
             No complex setup. No waiting rooms. No judgment. Just compassionate AI support, right now.
           </p>
         </motion.div>
@@ -136,8 +136,8 @@ const HowItWorksSection = () => {
                   >
                     {step.icon}
                   </div>
-                  <h3 className="text-2xl md:text-3xl font-black text-land-ink">{step.title}</h3>
-                  <p className="text-land-muted text-[17px] leading-relaxed max-w-md">{step.desc}</p>
+                  <h3 className="text-2xl md:text-3xl font-black text-[#0D1B2A]">{step.title}</h3>
+                  <p className="text-[#3D5A80] text-[17px] leading-relaxed max-w-md">{step.desc}</p>
 
                   {i === steps.length - 1 && (
                     <button

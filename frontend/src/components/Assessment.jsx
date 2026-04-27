@@ -89,26 +89,26 @@ const Assessment = () => {
     // Render Intro
     if (step === -1) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-100/50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
+            <div className="min-h-screen bg-[#E8E8E8] flex items-center justify-center p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[#C2FFF0]/50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
                 <div className="max-w-2xl w-full relative z-10 text-center">
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-6">
-                        <Heart className="text-blue-500" size={32} />
+                        <Heart className="text-[#1B98E0]" size={32} />
                     </div>
-                    <h1 className="text-4xl font-bold tracking-tight text-slate-800 mb-4">Welcome to SereneMind</h1>
-                    <p className="text-lg text-slate-600 mb-8 leading-relaxed px-4">
+                    <h1 className="text-4xl font-bold tracking-tight text-[#0D1B2A] mb-4">Welcome to SereneMind</h1>
+                    <p className="text-lg text-[#3D5A80] mb-8 leading-relaxed px-4">
                         To customize your AI therapy experience and provide accurate support, we need to complete a brief foundational assessment (The PHQ-9 Clinical Screener). This typically takes less than 2 minutes.
                     </p>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-10 text-left flex items-start gap-4">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#0E7C7B]/10 mb-10 text-left flex items-start gap-4">
                         <ShieldCheck className="text-emerald-500 shrink-0 mt-1" size={24} />
                         <div>
-                            <h3 className="font-bold text-slate-800">100% Private & Secure</h3>
-                            <p className="text-sm text-slate-500 mt-1">Your responses are encrypted, bound strictly to your session, and used solely to calibrate the AI's empathetic baseline. They are never shared.</p>
+                            <h3 className="font-bold text-[#0D1B2A]">100% Private & Secure</h3>
+                            <p className="text-sm text-[#3D5A80] mt-1">Your responses are encrypted, bound strictly to your session, and used solely to calibrate the AI's empathetic baseline. They are never shared.</p>
                         </div>
                     </div>
                     <button 
                         onClick={() => setStep(0)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-xl transition-all shadow-lg hover:shadow-blue-600/30 text-lg flex items-center gap-3 mx-auto"
+                        className="bg-[#1B98E0] hover:bg-[#1689C9] text-white font-bold py-4 px-10 rounded-xl transition-all shadow-lg hover:shadow-[#1B98E0]/30 text-lg flex items-center gap-3 mx-auto"
                     >
                         Begin Assessment <ArrowRight />
                     </button>
@@ -119,10 +119,10 @@ const Assessment = () => {
 
     if (step === 10) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-[#E8E8E8] flex items-center justify-center p-6">
                 <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent flex rounded-full animate-spin mb-4"></div>
-                    <h3 className="text-lg font-bold text-slate-800">Calibrating your therapy engine...</h3>
+                    <div className="w-12 h-12 border-4 border-[#1B98E0] border-t-transparent flex rounded-full animate-spin mb-4"></div>
+                    <h3 className="text-lg font-bold text-[#0D1B2A]">Calibrating your therapy engine...</h3>
                     {error && <p className="text-red-500 mt-2">{error}</p>}
                 </div>
             </div>
@@ -137,17 +137,17 @@ const Assessment = () => {
         : ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative">
+        <div className="min-h-screen bg-[#E8E8E8] flex items-center justify-center p-6 relative">
             <div className="max-w-2xl w-full relative z-10">
                 {/* Progress bar */}
                 <div className="mb-8">
-                    <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                    <div className="flex justify-between text-xs font-bold text-[#3D5A80] mb-2 uppercase tracking-wider">
                         <span>Question {step + 1} of 10</span>
                         <span>{Math.round((step / 10) * 100)}% Completed</span>
                     </div>
-                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#C2FFF0]/50 rounded-full overflow-hidden">
                         <motion.div 
-                            className="h-full bg-blue-500"
+                            className="h-full bg-[#1B98E0]"
                             initial={{ width: `${(step / 10) * 100}%` }}
                             animate={{ width: `${((step + 1) / 10) * 100}%` }}
                             transition={{ duration: 0.3 }}
@@ -158,7 +158,7 @@ const Assessment = () => {
                 {step > 0 && (
                     <button 
                         onClick={() => setStep(step - 1)}
-                        className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
+                        className="mb-6 flex items-center gap-2 text-sm font-semibold text-[#3D5A80] hover:text-[#0D1B2A] transition"
                     >
                         <ArrowLeft size={16} /> Back
                     </button>
@@ -171,12 +171,12 @@ const Assessment = () => {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.3 }}
-                        className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 md:p-12"
+                        className="bg-white rounded-3xl shadow-xl border border-[#0E7C7B]/10 p-8 md:p-12"
                     >
                         {!isFunctional && (
-                            <h4 className="text-sm font-bold text-blue-500 mb-2">Over the last 2 weeks:</h4>
+                            <h4 className="text-sm font-bold text-[#1B98E0] mb-2">Over the last 2 weeks:</h4>
                         )}
-                        <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8 leading-tight">
+                        <h2 className="text-2xl md:text-3xl font-bold text-[#0D1B2A] mb-8 leading-tight">
                             {currentQuestion}
                         </h2>
 
@@ -189,13 +189,13 @@ const Assessment = () => {
                                         onClick={() => handleSelect(step, idx)}
                                         className={`w-full text-left p-5 rounded-2xl transition-all border-2 flex items-center justify-between ${
                                             isSelected 
-                                                ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-md scale-[1.02]' 
-                                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50 text-slate-700'
+                                                ? 'border-[#1B98E0] bg-[#1B98E0]/5 text-[#0D1B2A] shadow-md scale-[1.02]' 
+                                                : 'border-[#0E7C7B]/10 hover:border-[#1B98E0]/40 hover:bg-[#C2FFF0]/15 text-[#0D1B2A]'
                                         }`}
                                     >
                                         <span className="font-medium text-lg">{opt}</span>
-                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-blue-500' : 'border-slate-300'}`}>
-                                            {isSelected && <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />}
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-[#1B98E0]' : 'border-[#0E7C7B]/30'}`}>
+                                            {isSelected && <div className="w-2.5 h-2.5 bg-[#1B98E0] rounded-full" />}
                                         </div>
                                     </button>
                                 );

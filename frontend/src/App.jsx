@@ -46,7 +46,7 @@ const AssessmentRoute = ({ children }) => {
 // Layout component wrapping the Sidebar
 const MainLayout = ({ children }) => {
   return (
-    <div className="flex h-screen bg-serene-dark text-serene-text font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#E8E8E8] text-[#0D1B2A] font-sans overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col relative w-full h-full">
          {children}

@@ -69,37 +69,37 @@ const Settings = () => {
     };
 
     return (
-        <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10 flex border-l border-slate-300 bg-slate-100/50">
+        <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10 flex border-l border-[#0E7C7B]/15 bg-[#E8E8E8]">
             <div className="w-full max-w-4xl mx-auto">
-                <header className="mb-10 flex items-center gap-4 border-b border-slate-300 pb-6">
-                    <Link to="/dashboard" className="p-2 rounded-full hover:bg-slate-200 transition-colors text-slate-500 hover:text-slate-800 bg-slate-200/50">
+                <header className="mb-10 flex items-center gap-4 border-b border-[#0E7C7B]/15 pb-6">
+                    <Link to="/dashboard" className="p-2 rounded-full hover:bg-[#C2FFF0]/50 transition-colors text-[#3D5A80] hover:text-[#0D1B2A] bg-[#C2FFF0]/20">
                         <ArrowLeft size={20} />
                     </Link>
-                    <div className="w-10 h-10 rounded-xl bg-slate-300 flex items-center justify-center text-slate-600 shadow-inner">
+                    <div className="w-10 h-10 rounded-xl bg-[#0E7C7B]/10 flex items-center justify-center text-[#0E7C7B] shadow-inner">
                         <SettingsIcon size={22} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-800 leading-none">{t('settings_title')}</h1>
-                        <p className="text-slate-500 text-sm mt-1">{t('settings_desc')}</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-[#0D1B2A] leading-none">{t('settings_title')}</h1>
+                        <p className="text-[#3D5A80] text-sm mt-1">{t('settings_desc')}</p>
                     </div>
                 </header>
 
                 {message && (
-                    <div className="mb-6 p-4 rounded-xl bg-slate-200 border border-slate-400 text-slate-800 text-sm font-medium shadow-sm transition-all animate-in fade-in slide-in-from-top-4">
+                    <div className="mb-6 p-4 rounded-xl bg-[#C2FFF0]/40 border border-[#0E7C7B]/20 text-[#0D1B2A] text-sm font-medium shadow-sm transition-all animate-in fade-in slide-in-from-top-4">
                         {message}
                     </div>
                 )}
 
                 <div className="space-y-6">
                     {/* Language Settings */}
-                    <section className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 lg:p-8">
+                    <section className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-6 lg:p-8">
                         <div className="flex items-center gap-3 mb-6 px-1 border-b border-transparent">
-                            <Globe className="text-blue-500" size={24} />
-                            <h2 className="text-xl font-bold text-slate-800">{t('settings_language')}</h2>
+                            <Globe className="text-[#1B98E0]" size={24} />
+                            <h2 className="text-xl font-bold text-[#0D1B2A]">{t('settings_language')}</h2>
                         </div>
                         <div className="px-1">
                             <select 
-                                className="w-full md:w-64 bg-white/80 border border-slate-300 rounded-xl px-4 py-3 text-slate-700 font-medium focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer"
+                                className="w-full md:w-64 bg-white/80 border border-[#0E7C7B]/20 rounded-xl px-4 py-3 text-[#0D1B2A] font-medium focus:outline-none focus:border-[#1B98E0] focus:ring-2 focus:ring-[#1B98E0]/20 transition-all cursor-pointer"
                                 value={i18n.language}
                                 onChange={(e) => i18n.changeLanguage(e.target.value)}
                             >
@@ -113,17 +113,17 @@ const Settings = () => {
                     </section>
 
                     {/* Account Details */}
-                    <section className="bg-slate-200/50 backdrop-blur-md border border-slate-400 rounded-3xl p-6 lg:p-8">
-                        <h2 className="text-xl font-bold text-slate-800 mb-6 px-1 border-b border-transparent">{t('settings_account_info')}</h2>
+                    <section className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-6 lg:p-8">
+                        <h2 className="text-xl font-bold text-[#0D1B2A] mb-6 px-1 border-b border-transparent">{t('settings_account_info')}</h2>
                         
                         <div className="flex flex-col gap-5 px-1">
                             <div>
-                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{t('settings_username')}</label>
-                                <div className="bg-white/50 border border-slate-300 rounded-xl px-4 py-3 text-slate-700">{user.username}</div>
+                                <label className="block text-[#3D5A80] text-xs font-bold uppercase tracking-wider mb-2">{t('settings_username')}</label>
+                                <div className="bg-[#C2FFF0]/20 border border-[#0E7C7B]/10 rounded-xl px-4 py-3 text-[#0D1B2A]">{user.username}</div>
                             </div>
                             <div>
-                                <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{t('settings_email')}</label>
-                                <div className="bg-white/50 border border-slate-300 rounded-xl px-4 py-3 text-slate-700">{user.email}</div>
+                                <label className="block text-[#3D5A80] text-xs font-bold uppercase tracking-wider mb-2">{t('settings_email')}</label>
+                                <div className="bg-[#C2FFF0]/20 border border-[#0E7C7B]/10 rounded-xl px-4 py-3 text-[#0D1B2A]">{user.email}</div>
                             </div>
                         </div>
                     </section>
@@ -132,19 +132,19 @@ const Settings = () => {
                     <section className="bg-red-50/50 backdrop-blur-md border border-red-200 rounded-3xl p-6 lg:p-8">
                         <div className="flex items-center gap-3 mb-6 px-1">
                             <Shield className="text-red-500" size={24} />
-                            <h2 className="text-xl font-bold text-slate-800">{t('settings_data')}</h2>
+                            <h2 className="text-xl font-bold text-[#0D1B2A]">{t('settings_data')}</h2>
                         </div>
                         
                         <div className="space-y-6 px-1">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 hover:border-red-300 transition-colors">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-[#0E7C7B]/10 hover:border-red-300 transition-colors">
                                 <div>
-                                    <h3 className="font-bold text-slate-800">{t('settings_clear_history')}</h3>
-                                    <p className="text-sm text-slate-500 mt-1 max-w-md">Erase all past conversations with the AI Therapist. This action cannot be undone.</p>
+                                    <h3 className="font-bold text-[#0D1B2A]">{t('settings_clear_history')}</h3>
+                                    <p className="text-sm text-[#3D5A80] mt-1 max-w-md">Erase all past conversations with the AI Therapist. This action cannot be undone.</p>
                                 </div>
                                 <button 
                                     onClick={handleClearHistory}
                                     disabled={isClearing}
-                                    className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-sm transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                                    className="px-5 py-2.5 bg-[#E8E8E8] hover:bg-[#C2FFF0]/50 text-[#0D1B2A] font-semibold rounded-xl text-sm transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                                 >
                                     <Trash2 size={16} /> {isClearing ? '...' : t('settings_clear_history')}
                                 </button>

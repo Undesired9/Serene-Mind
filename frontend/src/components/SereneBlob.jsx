@@ -18,7 +18,7 @@ const BlobShape = ({ isCrisis, isTyping }) => {
     <group>
       <Sphere ref={meshRef} args={[1, 64, 64]} scale={isCrisis ? 1.5 : (isTyping ? 1.3 : 1.2)}>
         <MeshDistortMaterial
-          color={isCrisis ? '#991b1b' : (isTyping ? '#bae6fd' : '#0ea5e9')}
+          color={isCrisis ? '#991b1b' : (isTyping ? '#C2FFF0' : '#1B98E0')}
           attach="material"
           distort={isCrisis ? 0.6 : (isTyping ? 0.4 : 0.25)} 
           speed={isCrisis ? 4 : (isTyping ? 2.5 : 1.5)} 
@@ -36,7 +36,7 @@ const BlobShape = ({ isCrisis, isTyping }) => {
           size={isTyping ? 3 : 1.5} 
           speed={isTyping ? 0.6 : 0.2} 
           opacity={isTyping ? 0.6 : 0.3} 
-          color="#bae6fd" 
+          color="#C2FFF0" 
         />
       )}
     </group>
@@ -49,7 +49,7 @@ export default function SereneBlob({ isCrisis, isTyping }) {
       <Canvas camera={{ position: [0, 0, 4.5], fov: 45 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1.5} />
-        <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#0ea5e9" />
+        <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#0E7C7B" />
         <BlobShape isCrisis={isCrisis} isTyping={isTyping} />
         <Environment preset="city" />
       </Canvas>

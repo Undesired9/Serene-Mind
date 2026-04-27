@@ -183,19 +183,19 @@ const ChatInterface = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-serene-dark relative overflow-hidden">
+        <div className="flex-1 flex flex-col h-screen bg-[#E8E8E8] relative overflow-hidden">
             <SereneBlob isCrisis={isCrisis} isTyping={isTyping} />
             {/* Header */}
-            <header className="h-16 border-b border-slate-400/50 flex items-center justify-between px-6 bg-transparent relative z-10">
+            <header className="h-16 border-b border-[#0E7C7B]/20 flex items-center justify-between px-6 bg-transparent relative z-10">
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-1 -right-1 animate-pulse"></div>
-                        <HeartPulse className="text-slate-600" />
+                        <HeartPulse className="text-[#0E7C7B]" />
                     </div>
                     <div>
-                        <h2 className="font-semibold tracking-wide flex items-center gap-2 text-slate-800">
+                        <h2 className="font-semibold tracking-wide flex items-center gap-2 text-[#0D1B2A]">
                             AI Therapist 
-                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full border border-slate-400 font-normal">{t('chat_private')}</span>
+                            <span className="text-xs bg-[#C2FFF0]/50 text-[#0E7C7B] px-2 py-0.5 rounded-full border border-[#0E7C7B]/15 font-normal">{t('chat_private')}</span>
                         </h2>
                     </div>
                 </div>
@@ -205,7 +205,7 @@ const ChatInterface = () => {
                         setVoiceEnabled(!voiceEnabled);
                         if(voiceEnabled) window.speechSynthesis?.cancel(); // Mute immediately
                     }}
-                    className={`p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm ${voiceEnabled ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200' : 'bg-slate-200 text-slate-500 hover:bg-slate-300 border border-slate-300'}`}
+                    className={`p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm ${voiceEnabled ? 'bg-[#1B98E0]/10 text-[#1B98E0] hover:bg-[#1B98E0]/20 border border-[#1B98E0]/20' : 'bg-[#E8E8E8] text-[#3D5A80] hover:bg-[#C2FFF0]/30 border border-[#0E7C7B]/15'}`}
                     title={voiceEnabled ? "Mute AI Therapist" : "Unmute AI Therapist"}
                 >
                     {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -251,11 +251,11 @@ const ChatInterface = () => {
                         >
                             <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] ${
                                 msg.sender === 'user' 
-                                    ? 'bg-slate-300 text-slate-900 rounded-tr-sm shadow-md shadow-slate-300/20' 
-                                    : 'bg-serene-card border border-slate-400 rounded-tl-sm text-slate-800'
+                                    ? 'bg-[#1B98E0] text-white rounded-tr-sm shadow-md shadow-[#1B98E0]/20' 
+                                    : 'bg-white/80 border border-[#0E7C7B]/15 rounded-tl-sm text-[#0D1B2A]'
                             } ${msg.isCrisisNote ? 'border-red-500/50 bg-red-900/20' : ''}`}>
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                                <span className={`text-[10px] mt-2 block ${msg.sender === 'user' ? 'text-slate-700/80 font-medium' : 'text-slate-500'}`}>
+                                <span className={`text-[10px] mt-2 block ${msg.sender === 'user' ? 'text-white/70 font-medium' : 'text-[#3D5A80]'}`}>
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
@@ -263,10 +263,10 @@ const ChatInterface = () => {
                     ))}
                     {isTyping && (
                         <div className="flex justify-start">
-                            <div className="bg-serene-card border border-slate-400 rounded-2xl rounded-tl-sm px-5 py-4 flex gap-1.5 items-center">
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.2 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
-                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.4 }} className="w-1.5 h-1.5 bg-slate-500 rounded-full"></motion.span>
+                            <div className="bg-white/80 border border-[#0E7C7B]/15 rounded-2xl rounded-tl-sm px-5 py-4 flex gap-1.5 items-center">
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0 }} className="w-1.5 h-1.5 bg-[#0E7C7B] rounded-full"></motion.span>
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.2 }} className="w-1.5 h-1.5 bg-[#0E7C7B] rounded-full"></motion.span>
+                                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.4, delay: 0.4 }} className="w-1.5 h-1.5 bg-[#0E7C7B] rounded-full"></motion.span>
                             </div>
                         </div>
                     )}
@@ -275,7 +275,7 @@ const ChatInterface = () => {
             </div>
 
             {/* Input Area */}
-            <div className="bg-transparent border-t border-slate-400/50 p-6 pt-5 relative z-10">
+            <div className="bg-transparent border-t border-[#0E7C7B]/20 p-6 pt-5 relative z-10">
                 <form onSubmit={handleSend} className="max-w-4xl mx-auto flex gap-3 relative">
                     <input 
                         type="text" 
@@ -283,14 +283,14 @@ const ChatInterface = () => {
                         onChange={(e) => setInput(e.target.value)}
                         disabled={isCrisis}
                         placeholder={isCrisis ? "Chat disabled during emergency protocol." : (isRecording ? "Listening..." : t('chat_placeholder'))}
-                        className={`flex-1 bg-slate-200 text-slate-800 placeholder-slate-500 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-slate-400 border transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px] ${isRecording ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50/50' : 'border-slate-300'}`}
+                        className={`flex-1 bg-white/80 text-[#0D1B2A] placeholder-[#3D5A80]/60 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px] ${isRecording ? 'border-[#1B98E0] ring-2 ring-[#1B98E0]/20 bg-[#C2FFF0]/20' : 'border-[#0E7C7B]/15'}`}
                         autoFocus
                     />
                     <button 
                         type="button"
                         onClick={toggleVoice}
                         disabled={isCrisis}
-                        className={`w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' : 'bg-slate-300 hover:bg-slate-400 text-slate-600 shadow-slate-400/20'}`}
+                        className={`w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' : 'bg-[#C2FFF0]/60 hover:bg-[#C2FFF0] text-[#0E7C7B] shadow-[#0E7C7B]/10'}`}
                         title={isRecording ? "Click to stop recording" : "Click to start recording"}
                     >
                         <Mic size={20} className={isRecording ? "scale-110" : ""} />
@@ -298,12 +298,12 @@ const ChatInterface = () => {
                     <button 
                         type="submit" 
                         disabled={!input.trim() || isCrisis}
-                        className="bg-slate-500 hover:bg-slate-600 text-white w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-slate-500/20"
+                        className="bg-[#1B98E0] hover:bg-[#1689C9] text-white w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-[#1B98E0]/20"
                     >
                         <Send size={20} className={input.trim() ? "translate-x-0.5" : ""} />
                     </button>
                     {!isCrisis && (
-                         <div className="absolute -top-6 text-[11px] text-slate-600 flex items-center gap-1.5 left-2">
+                         <div className="absolute -top-6 text-[11px] text-[#3D5A80] flex items-center gap-1.5 left-2">
                              <Infinity size={12}/> AI generations can be inaccurate. Never rely on this for an emergency.
                          </div>
                     )}

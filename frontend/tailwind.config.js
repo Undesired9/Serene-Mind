@@ -8,12 +8,28 @@ export default {
     extend: {
       colors: {
         serene: {
-          dark: '#0f172a',
-          card: '#9FA0A5',
-          accent: '#C1C1C4', // Very soft airy white for dark mode
-          text: '#f8fafc',
-          muted: '#94a3b8'
+          dark: '#E8E8E8',       // Light gray background
+          card: '#C2FFF0',       // Light cyan for cards
+          accent: '#0E7C7B',     // Teal secondary accent
+          primary: '#1B98E0',    // Bright blue primary accent
+          text: '#0D1B2A',       // Dark navy text
+          muted: '#3D5A80'       // Muted blue-gray for secondary text
+        },
+        // Landing page tokens mapped to new palette
+        land: {
+          bg: '#E8E8E8',         // Light gray background
+          ink: '#0D1B2A',        // Dark navy text
+          primary: '#1B98E0',    // Bright blue
+          secondary: '#0E7C7B',  // Teal
+          teal: '#0E7C7B',       // Teal accent
+          muted: '#3D5A80',      // Muted text
+          border: '#0E7C7B20',   // Teal border (transparent)
+          surface: '#ffffff',    // White surface
+          soft: '#C2FFF0',       // Light cyan soft bg
         }
+      },
+      fontFamily: {
+        display: ['Inter', 'system-ui', 'sans-serif'],
       }
     },
   },
