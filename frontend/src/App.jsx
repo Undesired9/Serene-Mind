@@ -43,6 +43,20 @@ const AssessmentRoute = ({ children }) => {
   return children;
 };
 
+// Route wrapper for doctor access
+const DoctorRoute = ({ children }) => {
+  const token = localStorage.getItem('serene_token');
+  const userStr = localStorage.getItem('serene_user');
+  
+  if (!token || !userStr) return <Navigate to="/login" replace />;
+  
+  const user = JSON.parse(userStr);
+  if (user.role !== 'doctor') {
+      return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
+
 // Layout component wrapping the Sidebar
 const MainLayout = ({ children }) => {
   return (
