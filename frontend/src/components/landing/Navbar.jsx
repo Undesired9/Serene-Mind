@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const links = ['Features', 'How It Works', 'Testimonials'];
 
@@ -36,9 +36,7 @@ const Navbar = () => {
       <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="w-8 h-8 bg-gradient-to-br from-[#1B98E0] to-[#0E7C7B] rounded-xl flex items-center justify-center shadow-md">
-            <Sparkles size={16} className="text-white" />
-          </div>
+          <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-12 h-12 object-contain" />
           <span className="text-[#0D1B2A] font-bold text-lg tracking-tight">SereneMind</span>
         </div>
 

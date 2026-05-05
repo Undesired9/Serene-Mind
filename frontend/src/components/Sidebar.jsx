@@ -18,9 +18,7 @@ const Sidebar = () => {
     return (
         <div className="w-64 h-screen bg-[#C2FFF0]/30 border-r border-[#0E7C7B]/20 flex flex-col p-4 z-20 relative backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-10 px-2 mt-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                <div className="w-8 h-8 rounded-lg bg-[#0E7C7B] flex items-center justify-center shadow-md shadow-[#0E7C7B]/20">
-                    <span className="text-white font-bold">S</span>
-                </div>
+                <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-12 h-12 object-contain" />
                 <h1 className="text-xl font-bold tracking-tight text-[#0D1B2A]">SereneMind</h1>
             </div>
             

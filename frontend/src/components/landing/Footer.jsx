@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, MessageCircle, Globe, Mail, Heart } from 'lucide-react';
+import { MessageCircle, Globe, Mail, Heart } from 'lucide-react';
 
 const cols = [
   {
@@ -23,9 +23,7 @@ const Footer = () => (
       {/* Brand */}
       <div className="lg:col-span-2">
         <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#1B98E0] to-[#0E7C7B] rounded-xl flex items-center justify-center">
-            <Sparkles size={16} className="text-white" />
-          </div>
+          <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-12 h-12 object-contain" />
           <span className="font-bold text-lg tracking-tight">SereneMind</span>
         </div>
         <p className="text-[#3D5A80] text-sm leading-relaxed max-w-xs mb-6">

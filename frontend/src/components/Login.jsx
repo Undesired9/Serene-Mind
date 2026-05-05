@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Sparkles, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -51,9 +51,7 @@ const Login = () => {
 
       <div className="w-full max-w-md bg-white/60 backdrop-blur-xl border border-[#0E7C7B]/15 p-8 rounded-3xl shadow-2xl z-10">
         <div className="flex flex-col items-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-[#0E7C7B] flex items-center justify-center shadow-md shadow-[#0E7C7B]/20 mb-4">
-                <Sparkles className="text-white" size={24} />
-            </div>
+            <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-24 h-24 object-contain mb-4 drop-shadow-md" />
             <h1 className="text-3xl font-bold tracking-tight text-[#0D1B2A] mb-2">SereneMind</h1>
             <p className="text-[#3D5A80] text-sm text-center">Your private, AI-powered space for mental clarity and peace.</p>
         </div>
