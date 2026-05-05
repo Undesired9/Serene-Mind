@@ -95,53 +95,50 @@ router.delete('/account', verifyToken, (req, res) => {
     });
 });
 
-// Submit PHQ-9 Assessment
+// Submit Clinical Assessment (21 questions)
 router.post('/assessment', verifyToken, (req, res) => {
     const userId = req.user.id;
-    const { answers } = req.body; 
-    // answers should be an array of length 10. (9 PHQ questions + 1 functional impact question)
+    const { 
+        answers, 
+        depressionScore, 
+        anxietyScore, 
+        stressScore, 
+        totalScore, 
+        mainConcerns, 
+        selfHarmRisk 
+    } = req.body; 
 
-    if (!answers || !Array.isArray(answers) || answers.length !== 10) {
-        return res.status(400).json({ error: 'Invalid assessment format. Expected 10 answers.' });
+    if (!answers || !Array.isArray(answers) || answers.length !== 21) {
+        return res.status(400).json({ error: 'Invalid assessment format. Expected 21 answers.' });
     }
-
-    // Score the first 9 questions (0 to 3 scale mapped to 0 to 27)
-    let totalScore = 0;
-    for (let i = 0; i < 9; i++) {
-        totalScore += parseInt(answers[i] || 0);
-    }
-    
-    // Determine severity based on standard PHQ-9 cutpoints
-    let severity = 'None-minimal';
-    if (totalScore >= 5 && totalScore <= 9) severity = 'Mild';
-    else if (totalScore >= 10 && totalScore <= 14) severity = 'Moderate';
-    else if (totalScore >= 15 && totalScore <= 19) severity = 'Moderately severe';
-    else if (totalScore >= 20) severity = 'Severe';
-
-    // Question 9 checks for self-harm/suicide risk (answers[8] because 0-indexed)
-    const crisisRisk = parseInt(answers[8] || 0) > 0;
 
     const sql = `
         INSERT INTO Assessments (
-            user_id, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, 
-            total_score, severity, crisis_risk
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            user_id, answers, depression_score, anxiety_score, stress_score, 
+            total_score, main_concern, self_harm_risk
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
-        userId, ...answers, totalScore, severity, crisisRisk
+        userId, 
+        JSON.stringify(answers), 
+        depressionScore, 
+        anxietyScore, 
+        stressScore, 
+        totalScore, 
+        mainConcerns, 
+        selfHarmRisk ? 1 : 0
     ];
 
     db.run(sql, params, function(err) {
         if (err) {
             console.error('Assessment insert error:', err);
-            // If UNIQUE constraint fails, they already took it.
             if (err.message.includes('UNIQUE')) {
                  return res.status(400).json({ error: 'Assessment already completed.' });
             }
             return res.status(500).json({ error: 'Failed to save assessment.' });
         }
-        res.status(201).json({ message: 'Assessment saved successfully', severity, crisisRisk });
+        res.status(201).json({ message: 'Assessment saved successfully' });
     });
 });
 

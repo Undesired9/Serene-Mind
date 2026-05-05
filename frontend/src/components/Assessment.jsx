@@ -3,25 +3,48 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
 
-const phq9Questions = [
-    "Little interest or pleasure in doing things",
-    "Feeling down, depressed, or hopeless",
-    "Trouble falling or staying asleep, or sleeping too much",
-    "Feeling tired or having little energy",
-    "Poor appetite or overeating",
-    "Feeling bad about yourself — or that you are a failure or have let yourself or your family down",
-    "Trouble concentrating on things, such as reading the newspaper or watching television",
-    "Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving a lot more than usual",
-    "Thoughts that you would be better off dead, or of hurting yourself in some way",
+const questionsData = [
+    // Depression
+    { id: "D1", category: "depression", text: "Little interest or pleasure in doing things" },
+    { id: "D2", category: "depression", text: "Feeling down, depressed, or hopeless" },
+    { id: "D3", category: "depression", text: "Trouble sleeping, sleeping too much, or poor sleep quality" },
+    { id: "D4", category: "depression", text: "Feeling tired or having little energy" },
+    { id: "D5", category: "depression", text: "Poor appetite or overeating" },
+    { id: "D6", category: "depression", text: "Feeling bad about yourself, like you are a failure or have let yourself or others down" },
+    { id: "D7", category: "depression", text: "Thoughts that you would be better off dead or of hurting yourself" },
+    
+    // Anxiety
+    { id: "A1", category: "anxiety", text: "Feeling nervous, anxious, or on edge" },
+    { id: "A2", category: "anxiety", text: "Not being able to stop or control worrying" },
+    { id: "A3", category: "anxiety", text: "Worrying too much about different things" },
+    { id: "A4", category: "anxiety", text: "Trouble relaxing" },
+    { id: "A5", category: "anxiety", text: "Feeling restless or unable to sit still" },
+    { id: "A6", category: "anxiety", text: "Becoming easily annoyed or irritable" },
+    { id: "A7", category: "anxiety", text: "Feeling afraid as if something bad might happen" },
+    
+    // Stress
+    { id: "S1", category: "stress", text: "Feeling under constant strain or pressure" },
+    { id: "S2", category: "stress", text: "Finding it hard to concentrate on what you are doing" },
+    { id: "S3", category: "stress", text: "Feeling unable to cope with daily problems" },
+    { id: "S4", category: "stress", text: "Feeling unhappy or losing confidence in yourself" },
+    { id: "S5", category: "stress", text: "Not enjoying normal day-to-day activities" },
+    { id: "S6", category: "stress", text: "Feeling overwhelmed by responsibilities" },
+    { id: "S7", category: "stress", text: "Feeling that your general mental well-being is worse than usual" }
 ];
 
-const functionalQuestion = "How difficult have these problems made it for you to do your work, take care of things at home, or get along with other people?";
+const getSeverity = (score) => {
+    if (score <= 4) return "Minimal";
+    if (score <= 9) return "Mild";
+    if (score <= 14) return "Moderate";
+    return "Severe";
+};
 
 const Assessment = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(-1); // -1 = Intro, 0-8 = PHQ-9, 9 = Functional, 10 = Submitting
-    const [answers, setAnswers] = useState(Array(10).fill(null));
+    const [step, setStep] = useState(-1); // -1 = Intro, 0-20 = Questions, 21 = Submitting, 22 = Results
+    const [answers, setAnswers] = useState(Array(questionsData.length).fill(null));
     const [error, setError] = useState('');
+    const [results, setResults] = useState(null);
 
     const handleSelect = (idx, value) => {
         const newAnswers = [...answers];
@@ -30,27 +53,57 @@ const Assessment = () => {
         
         // Auto-advance
         setTimeout(() => {
-             // If we answered the last PHQ question, check if score > 0 to show question 10
-             if (idx === 8) {
-                 const sum = newAnswers.slice(0, 9).reduce((a,b) => a + (b || 0), 0);
-                 if (sum === 0) {
-                     // They scored zero, functionally question 10 is implicitly 0
-                     newAnswers[9] = 0;
-                     setAnswers(newAnswers);
-                     submitAssessment(newAnswers);
-                     return;
-                 }
+             if (idx === questionsData.length - 1) {
+                 calculateResultsAndSubmit(newAnswers);
+             } else {
+                 setStep(prev => prev + 1);
              }
-             if (idx === 9) {
-                 submitAssessment(newAnswers);
-                 return;
-             }
-             setStep(prev => prev + 1);
         }, 300);
     };
 
-    const submitAssessment = async (finalAnswers) => {
-        setStep(10);
+    const calculateResultsAndSubmit = async (finalAnswers) => {
+        setStep(21); // submitting state
+        
+        let depressionScore = 0;
+        let anxietyScore = 0;
+        let stressScore = 0;
+        let d7Score = 0;
+
+        finalAnswers.forEach((val, idx) => {
+            const q = questionsData[idx];
+            if (q.category === 'depression') depressionScore += val;
+            if (q.category === 'anxiety') anxietyScore += val;
+            if (q.category === 'stress') stressScore += val;
+            if (q.id === 'D7') d7Score = val;
+        });
+
+        const totalScore = depressionScore + anxietyScore + stressScore;
+
+        const issues = {
+            depression: depressionScore >= 10,
+            anxiety: anxietyScore >= 10,
+            stress: stressScore >= 10,
+        };
+
+        const maxScore = Math.max(depressionScore, anxietyScore, stressScore);
+        const mainConcerns = [];
+        if (depressionScore === maxScore) mainConcerns.push("Depression");
+        if (anxietyScore === maxScore) mainConcerns.push("Anxiety");
+        if (stressScore === maxScore) mainConcerns.push("Stress");
+
+        const computedResults = {
+            depressionScore,
+            depressionSeverity: getSeverity(depressionScore),
+            anxietyScore,
+            anxietySeverity: getSeverity(anxietyScore),
+            stressScore,
+            stressSeverity: getSeverity(stressScore),
+            totalScore,
+            mainConcerns: mainConcerns.join(', '),
+            issues,
+            selfHarmRisk: d7Score > 0
+        };
+
         try {
             const token = localStorage.getItem('serene_token');
             const response = await fetch('http://localhost:5000/api/auth/assessment', {
@@ -59,7 +112,10 @@ const Assessment = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}` 
                 },
-                body: JSON.stringify({ answers: finalAnswers })
+                body: JSON.stringify({ 
+                    answers: finalAnswers,
+                    ...computedResults
+                })
             });
 
             if (!response.ok) {
@@ -75,15 +131,17 @@ const Assessment = () => {
                 localStorage.setItem('serene_user', JSON.stringify(user));
             }
             
-            // Wait slightly for UX
-            setTimeout(() => {
-                navigate('/dashboard', { replace: true });
-            }, 1000);
+            setResults(computedResults);
+            setStep(22); // results state
 
         } catch (err) {
             setError(err.message);
-            setStep(9); // let them try submitting again
+            setStep(20); // let them try submitting again from the last question
         }
+    };
+
+    const handleContinue = () => {
+        navigate('/dashboard', { replace: true });
     };
 
     // Render Intro
@@ -97,8 +155,13 @@ const Assessment = () => {
                     </div>
                     <h1 className="text-4xl font-bold tracking-tight text-[#0D1B2A] mb-4">Welcome to SereneMind</h1>
                     <p className="text-lg text-[#3D5A80] mb-8 leading-relaxed px-4">
-                        To customize your AI therapy experience and provide accurate support, we need to complete a brief foundational assessment (The PHQ-9 Clinical Screener). This typically takes less than 2 minutes.
+                        To customize your AI therapy experience and provide accurate support, we need to complete a brief foundational assessment. This screens for depression, anxiety, and stress levels.
                     </p>
+                    <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-xl mb-6 text-left">
+                        <p className="text-amber-800 text-sm font-medium">
+                            This questionnaire is for screening purposes only and is not a medical diagnosis.
+                        </p>
+                    </div>
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#0E7C7B]/10 mb-10 text-left flex items-start gap-4">
                         <ShieldCheck className="text-emerald-500 shrink-0 mt-1" size={24} />
                         <div>
@@ -117,7 +180,7 @@ const Assessment = () => {
         );
     }
 
-    if (step === 10) {
+    if (step === 21) {
         return (
             <div className="min-h-screen bg-[#E8E8E8] flex items-center justify-center p-6">
                 <div className="flex flex-col items-center">
@@ -129,12 +192,68 @@ const Assessment = () => {
         );
     }
 
-    // Render Questions (0-9)
-    const isFunctional = step === 9;
-    const currentQuestion = isFunctional ? functionalQuestion : phq9Questions[step];
-    const options = isFunctional 
-        ? ['Not difficult at all', 'Somewhat difficult', 'Very difficult', 'Extremely difficult']
-        : ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
+    if (step === 22 && results) {
+        return (
+            <div className="min-h-screen bg-[#E8E8E8] p-6 md:p-10 flex items-center justify-center">
+                <div className="max-w-3xl w-full bg-white rounded-3xl p-8 shadow-xl border border-[#0E7C7B]/10">
+                    <h2 className="text-3xl font-bold text-[#0D1B2A] mb-6">Screening Results</h2>
+                    
+                    <div className="bg-[#1B98E0]/10 p-4 rounded-xl mb-6">
+                        <p className="text-[#0D1B2A] font-medium text-lg">Total Score: {results.totalScore} / 63</p>
+                        <p className="text-[#0D1B2A] font-medium text-lg">Main Concern: <span className="font-bold text-[#0E7C7B]">{results.mainConcerns}</span></p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-[#E8E8E8]/50 p-4 rounded-xl border border-[#0E7C7B]/20">
+                            <h3 className="font-bold text-[#0D1B2A] mb-2">Depression</h3>
+                            <p className="text-xl font-bold text-[#1B98E0]">{results.depressionScore}</p>
+                            <p className="text-sm text-[#3D5A80]">Severity: {results.depressionSeverity}</p>
+                            {results.issues.depression && <p className="text-xs font-bold text-amber-600 mt-2">Score ≥ 10</p>}
+                        </div>
+                        <div className="bg-[#E8E8E8]/50 p-4 rounded-xl border border-[#0E7C7B]/20">
+                            <h3 className="font-bold text-[#0D1B2A] mb-2">Anxiety</h3>
+                            <p className="text-xl font-bold text-[#1B98E0]">{results.anxietyScore}</p>
+                            <p className="text-sm text-[#3D5A80]">Severity: {results.anxietySeverity}</p>
+                            {results.issues.anxiety && <p className="text-xs font-bold text-amber-600 mt-2">Score ≥ 10</p>}
+                        </div>
+                        <div className="bg-[#E8E8E8]/50 p-4 rounded-xl border border-[#0E7C7B]/20">
+                            <h3 className="font-bold text-[#0D1B2A] mb-2">Stress</h3>
+                            <p className="text-xl font-bold text-[#1B98E0]">{results.stressScore}</p>
+                            <p className="text-sm text-[#3D5A80]">Severity: {results.stressSeverity}</p>
+                            {results.issues.stress && <p className="text-xs font-bold text-amber-600 mt-2">Score ≥ 10</p>}
+                        </div>
+                    </div>
+
+                    {results.selfHarmRisk && (
+                        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-xl mb-6">
+                            <h3 className="text-red-700 font-bold text-lg mb-2 flex items-center gap-2">
+                                ⚠️ Critical Warning
+                            </h3>
+                            <p className="text-red-700 mb-2 font-medium">
+                                Your response suggests possible self-harm thoughts. Please seek immediate support from a trusted person, emergency services, or a mental health professional.
+                            </p>
+                            <p className="text-red-600 text-sm">
+                                If you are in the U.S., call or text 988 for crisis support. If you are outside the U.S., contact your local emergency number or crisis helpline.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="mt-8 flex justify-end">
+                        <button
+                            onClick={handleContinue}
+                            className="px-8 py-4 bg-[#1B98E0] text-white rounded-xl font-bold hover:bg-[#1689C9] transition-colors flex items-center gap-2 shadow-md"
+                        >
+                            Continue to Dashboard <ArrowRight size={20} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Render Questions (0-20)
+    const currentQuestion = questionsData[step]?.text;
+    const options = ['0 = Not at all', '1 = Several days', '2 = More than half the days', '3 = Nearly every day'];
 
     return (
         <div className="min-h-screen bg-[#E8E8E8] flex items-center justify-center p-6 relative">
@@ -142,14 +261,14 @@ const Assessment = () => {
                 {/* Progress bar */}
                 <div className="mb-8">
                     <div className="flex justify-between text-xs font-bold text-[#3D5A80] mb-2 uppercase tracking-wider">
-                        <span>Question {step + 1} of 10</span>
-                        <span>{Math.round((step / 10) * 100)}% Completed</span>
+                        <span>Question {step + 1} of {questionsData.length}</span>
+                        <span>{Math.round((step / questionsData.length) * 100)}% Completed</span>
                     </div>
                     <div className="h-2 w-full bg-[#C2FFF0]/50 rounded-full overflow-hidden">
                         <motion.div 
                             className="h-full bg-[#1B98E0]"
-                            initial={{ width: `${(step / 10) * 100}%` }}
-                            animate={{ width: `${((step + 1) / 10) * 100}%` }}
+                            initial={{ width: `${(step / questionsData.length) * 100}%` }}
+                            animate={{ width: `${((step + 1) / questionsData.length) * 100}%` }}
                             transition={{ duration: 0.3 }}
                         />
                     </div>
@@ -173,9 +292,7 @@ const Assessment = () => {
                         transition={{ duration: 0.3 }}
                         className="bg-white rounded-3xl shadow-xl border border-[#0E7C7B]/10 p-8 md:p-12"
                     >
-                        {!isFunctional && (
-                            <h4 className="text-sm font-bold text-[#1B98E0] mb-2">Over the last 2 weeks:</h4>
-                        )}
+                        <h4 className="text-sm font-bold text-[#1B98E0] mb-2">Over the last 2 weeks, how often have you experienced the following?</h4>
                         <h2 className="text-2xl md:text-3xl font-bold text-[#0D1B2A] mb-8 leading-tight">
                             {currentQuestion}
                         </h2>

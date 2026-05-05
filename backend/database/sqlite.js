@@ -41,15 +41,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
             )`);
 
-            // Clinical Assessments (PHQ-9)
+            // Clinical Assessments (DASS-21 style / 21 questions)
             db.run(`CREATE TABLE IF NOT EXISTS Assessments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL UNIQUE,
-                q1 INTEGER, q2 INTEGER, q3 INTEGER, q4 INTEGER, q5 INTEGER,
-                q6 INTEGER, q7 INTEGER, q8 INTEGER, q9 INTEGER, q10 INTEGER,
+                answers TEXT NOT NULL,
+                depression_score INTEGER NOT NULL,
+                anxiety_score INTEGER NOT NULL,
+                stress_score INTEGER NOT NULL,
                 total_score INTEGER NOT NULL,
-                severity TEXT NOT NULL,
-                crisis_risk BOOLEAN NOT NULL,
+                main_concern TEXT,
+                self_harm_risk BOOLEAN NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
             )`);
