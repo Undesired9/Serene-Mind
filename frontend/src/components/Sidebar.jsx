@@ -21,17 +21,17 @@ const Sidebar = () => {
                 <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-12 h-12 object-contain" />
                 <h1 className="text-xl font-bold tracking-tight text-[#0D1B2A]">SereneMind</h1>
             </div>
-            
+
             <nav className="flex-1 space-y-2">
-                <NavItem icon={<Home size={20}/>} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
-                <NavItem icon={<MessageSquare size={20}/>} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
-                <NavItem icon={<Activity size={20}/>} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
-                <NavItem icon={<Settings size={20}/>} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
+                <NavItem icon={<Home size={20} />} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} />
+                <NavItem icon={<MessageSquare size={20} />} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} />
+                <NavItem icon={<Activity size={20} />} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} />
+                <NavItem icon={<Settings size={20} />} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
             </nav>
-            
+
             <div className="mt-auto border-t border-[#0E7C7B]/20 pt-4 space-y-2">
                 <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-[#3D5A80] hover:text-red-600 transition-colors w-full rounded-lg hover:bg-red-50">
-                    <LogOut size={20}/>
+                    <LogOut size={20} />
                     <span className="text-sm">{t('nav_logout')}</span>
                 </button>
             </div>
@@ -40,11 +40,10 @@ const Sidebar = () => {
 };
 
 const NavItem = ({ icon, label, active, onClick }) => (
-    <button onClick={onClick} className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all duration-200 ${
-        active 
-            ? 'bg-[#0E7C7B]/10 text-[#0E7C7B] border border-[#0E7C7B]/20 shadow-sm font-semibold' 
+    <button onClick={onClick} className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all duration-200 ${active
+            ? 'bg-[#0E7C7B]/10 text-[#0E7C7B] border border-[#0E7C7B]/20 shadow-sm font-semibold'
             : 'text-[#3D5A80] hover:bg-[#C2FFF0]/50 hover:text-[#0D1B2A]'
-    }`}>
+        }`}>
         {icon}
         <span className="font-medium text-sm">{label}</span>
     </button>
