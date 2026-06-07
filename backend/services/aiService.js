@@ -1,43 +1,31 @@
-const path = require('path');
+require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const CRISIS_KEYWORDS = [
     'suicide', 'kill', 'end my life', 'hurt myself', 'die', 'self-harm'
 ];
 
-let llama;
+let genAI;
 let model;
-let context;
 
-/* =========================
-   INIT MODEL (Singleton)
-========================= */
 async function initAI() {
-    if (llama) return;
+    if (genAI) return;
 
     try {
-        const llamaModule = await import("node-llama-cpp");
-        llama = await llamaModule.getLlama();
-
-        model = await llama.loadModel({
-            modelPath: path.join(__dirname, "../models/qwen2.5-3b-instruct-q4_k_m.gguf")
-        });
-
-        context = await model.createContext({
-            contextSize: 4096
-        });
-
-        console.log("✅ Qwen-2.5 model loaded");
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("GEMINI_API_KEY not found in environment variables");
+        }
+        genAI = new GoogleGenerativeAI(apiKey);
+        model = genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
+        console.log("✅ Gemini API initialized");
     } catch (error) {
-        console.error("❌ Model load failed:", error);
+        console.error("❌ Gemini init failed:", error);
     }
 }
 
-// preload
 initAI();
 
-/* =========================
-   RISK DETECTION
-========================= */
 const detectRisk = (message) => {
     const text = message.toLowerCase();
 
@@ -53,9 +41,6 @@ const detectRisk = (message) => {
     return 'LOW';
 };
 
-/* =========================
-   BUILD THERAPIST PROMPT
-========================= */
 const buildSystemPrompt = () => `You are SereneMind, a warm, compassionate, human-like emotional support counselor.
 
 ROLE:
@@ -81,25 +66,18 @@ STRICT RULES:
 CRISIS RULE:
 If the user expresses self-harm or suicidal intent, override normal behavior, respond with urgency, and direct them to immediate help.`;
 
-/* =========================
-   CLEAN MODEL OUTPUT
-========================= */
 const cleanOutput = (text) => {
     return text
-        .replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '') // remove lists
+        .replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '')
         .replace(/thought[\s\S]*?\n\n/i, '')
         .replace(/plan:[\s\S]*/i, '')
         .replace(/^.*?(?=(I|It sounds|That feels|You))/i, '')
         .trim();
 };
 
-/* =========================
-   CHAT HANDLER
-========================= */
 const handleChat = async (message, history = [], onTextChunk = null) => {
     const riskLevel = detectRisk(message);
 
-    /* -------- HIGH RISK -------- */
     if (riskLevel === 'HIGH') {
         return {
             reply: "I’m really sorry you’re feeling this way. Please reach out to a trusted person or your local emergency service right now—you don’t have to face this alone.",
@@ -110,7 +88,7 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
 
     await initAI();
 
-    if (!context) {
+    if (!model) {
         return {
             reply: "I'm having trouble connecting right now. Please try again shortly.",
             riskLevel,
@@ -118,33 +96,25 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         };
     }
 
-    const { LlamaChatSession } = await import("node-llama-cpp");
-    const sequence = context.getSequence();
-
     try {
-        // node-llama-cpp v3 handles chatML format properly when using systemPrompt.
-        const session = new LlamaChatSession({
-            contextSequence: sequence,
-            systemPrompt: buildSystemPrompt()
+        const chatHistory = history.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text || msg.content || "" }]
+        }));
+
+        const chat = model.startChat({
+            history: chatHistory,
+            systemInstruction: buildSystemPrompt(),
+            generationConfig: {
+                maxOutputTokens: 100,
+                temperature: 0.7,
+                topP: 0.9
+            }
         });
 
-        // Set up history for node-llama-cpp v3 session
-        if (history && history.length > 0) {
-            const chatHistory = history.map(msg => ({
-                type: msg.sender === 'user' ? 'user' : 'model',
-                text: msg.text || msg.content || "",
-                ...(msg.sender !== 'user' && { response: [msg.text || msg.content || ""] })
-            }));
-            session.setChatHistory(chatHistory);
-        }
-
-        const raw = await session.prompt(message, {
-            maxTokens: 100, // Short responses (1-2 sentences)
-            temperature: 0.7, // Warm, human-like variability
-            topP: 0.9, 
-            repeatPenalty: 1.1, // Prevent looping
-            onTextChunk: onTextChunk ? (chunk) => onTextChunk(chunk) : undefined
-        });
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        const raw = response.text();
 
         const reply = cleanOutput(raw) || "I hear you. Tell me more about that.";
 
@@ -162,33 +132,20 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
             riskLevel,
             isCrisis: false
         };
-    } finally {
-        sequence.dispose();
     }
 };
 
-/* =========================
-   REPORT GENERATION
-========================= */
 const generatePatientReportMock = async (patient, moodLogs, recentSessions) => {
     await initAI();
 
-    if (!context) {
+    if (!model) {
         return {
             title: `AI Wellness Summary for ${patient.username}`,
             content: "AI service unavailable."
         };
     }
 
-    const { LlamaChatSession } = await import("node-llama-cpp");
-    const sequence = context.getSequence();
-
     try {
-        const session = new LlamaChatSession({
-            contextSequence: sequence,
-            systemPrompt: "You are a clinical therapist AI assistant. Be concise, objective, and professional."
-        });
-
         const moodSummary = moodLogs.length
             ? `Average mood: ${Math.round(
                 moodLogs.reduce((a, b) => a + b.mood_score, 0) / moodLogs.length
@@ -205,10 +162,17 @@ Risk: ${hasHighRisk ? "Recent HIGH risk detected" : "No recent high risk"}
 Write a short clinical summary.
 `;
 
-        const content = await session.prompt(prompt, {
-            maxTokens: 150,
-            temperature: 0.3
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            systemInstruction: "You are a clinical therapist AI assistant. Be concise, objective, and professional.",
+            generationConfig: {
+                maxOutputTokens: 150,
+                temperature: 0.3
+            }
         });
+
+        const response = await result.response;
+        const content = response.text();
 
         return {
             title: `AI Wellness Summary for ${patient.username}`,
@@ -222,14 +186,9 @@ Write a short clinical summary.
             title: `AI Wellness Summary for ${patient.username}`,
             content: "Error generating report."
         };
-    } finally {
-        sequence.dispose();
     }
 };
 
-/* =========================
-   EXPORTS
-========================= */
 module.exports = {
     handleChat,
     detectRisk,
