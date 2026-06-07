@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, HeartPulse, Infinity, AlertTriangle, Mic, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import SereneBlob from './SereneBlob';
 
 const ChatInterface = () => {
@@ -12,6 +13,14 @@ const ChatInterface = () => {
     const [isCrisis, setIsCrisis] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [voiceEnabled, setVoiceEnabled] = useState(true);
+    
+    const [searchParams, setSearchParams] = useSearchParams();
+    const sessionIdParam = searchParams.get('session');
+    
+    // Active session state
+    const [activeSessionId, setActiveSessionId] = useState(null);
+    const [activeSessionTitle, setActiveSessionTitle] = useState('');
+
     const endOfMessagesRef = useRef(null);
     const recognitionRef = useRef(null);
     const isVoiceLockedRef = useRef(false); // Synchronous lock to prevent double firing
@@ -32,7 +41,6 @@ const ChatInterface = () => {
             };
             
             recognitionRef.current.onerror = (event) => {
-                // Ignore no-speech and network errors which are common harmless aborts in Chrome Web Speech API
                 if (event.error !== 'no-speech' && event.error !== 'network') {
                     console.error("Speech recognition error:", event.error);
                 }
@@ -81,7 +89,6 @@ const ChatInterface = () => {
                 setIsRecording(true);
                 setInput('');
             } catch (error) {
-                // Ignore InvalidStateError if it's already started
                 isVoiceLockedRef.current = false;
                 if (error.name !== 'InvalidStateError') {
                     console.error('Speech start error:', error);
@@ -99,16 +106,20 @@ const ChatInterface = () => {
         }
     };
 
+    // Load active session history when sessionIdParam changes
     useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const token = localStorage.getItem('serene_token');
-                const response = await fetch('http://localhost:5000/api/chat/history', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.length > 0) {
+        const loadHistory = async () => {
+            const token = localStorage.getItem('serene_token');
+            if (!token) return;
+
+            if (sessionIdParam) {
+                const sessionId = parseInt(sessionIdParam, 10);
+                try {
+                    const response = await fetch(`http://localhost:5000/api/chat/sessions/${sessionId}/history`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
                         const formatted = data.map(msg => ({
                             id: msg.id,
                             text: msg.content,
@@ -116,17 +127,57 @@ const ChatInterface = () => {
                             timestamp: msg.timestamp,
                             isCrisisNote: msg.risk_level === 'HIGH'
                         }));
-                        setMessages(formatted);
-                    } else {
-                        setMessages([{ id: Date.now(), text: "Hello there. I'm SereneMind. I'm here to listen without judgment. How are you feeling today?", sender: 'ai', timestamp: new Date() }]);
+                        setMessages(formatted.length > 0 ? formatted : [{ id: Date.now(), text: "Hello there. I'm SereneMind. How are you feeling today?", sender: 'ai', timestamp: new Date() }]);
+                        setActiveSessionId(sessionId);
+                        
+                        // Fetch sessions list to find the title for the header
+                        const listRes = await fetch('http://localhost:5000/api/chat/sessions', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (listRes.ok) {
+                            const listData = await listRes.json();
+                            const current = listData.find(s => s.id === sessionId);
+                            if (current) {
+                                setActiveSessionTitle(current.title);
+                            }
+                        }
                     }
+                } catch (error) {
+                    console.error('Failed to load session history', error);
                 }
-            } catch (error) {
-                console.error('Failed to fetch history', error);
+            } else {
+                // Fallback to fetch history for latest active session
+                try {
+                    const response = await fetch('http://localhost:5000/api/chat/history', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        // data is { messages: [], sessionId: X, sessionTitle: Y }
+                        if (data.messages && data.messages.length > 0) {
+                            const formatted = data.messages.map(msg => ({
+                                id: msg.id,
+                                text: msg.content,
+                                sender: msg.sender,
+                                timestamp: msg.timestamp,
+                                isCrisisNote: msg.risk_level === 'HIGH'
+                            }));
+                            setMessages(formatted);
+                        } else {
+                            setMessages([{ id: Date.now(), text: "Hello there. I'm SereneMind. How are you feeling today?", sender: 'ai', timestamp: new Date() }]);
+                        }
+                        setActiveSessionId(data.sessionId);
+                        setActiveSessionTitle(data.sessionTitle);
+                        setSearchParams({ session: data.sessionId });
+                    }
+                } catch (error) {
+                    console.error('Failed to load fallback history', error);
+                }
             }
         };
-        fetchHistory();
-    }, []);
+
+        loadHistory();
+    }, [sessionIdParam]);
 
     const scrollToBottom = () => {
         endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,7 +204,7 @@ const ChatInterface = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ message: input, history: messages })
+                body: JSON.stringify({ message: input, history: messages, sessionId: activeSessionId })
             });
             const data = await response.json();
             
@@ -171,6 +222,12 @@ const ChatInterface = () => {
                 timestamp: new Date(),
                 isCrisisNote: data.isCrisis
             }]);
+
+            if (data.sessionId && data.sessionId !== activeSessionId) {
+                setActiveSessionId(data.sessionId);
+                setSearchParams({ session: data.sessionId });
+                window.dispatchEvent(new Event('session-created'));
+            }
 
             if (!data.isCrisis) {
                 speakText(replyText);
@@ -197,6 +254,9 @@ const ChatInterface = () => {
                             AI Therapist 
                             <span className="text-xs bg-[#C2FFF0]/50 text-[#0E7C7B] px-2 py-0.5 rounded-full border border-[#0E7C7B]/15 font-normal">{t('chat_private')}</span>
                         </h2>
+                        {activeSessionTitle && (
+                            <p className="text-[10px] text-[#3D5A80]/80 font-bold tracking-wide mt-0.5 uppercase">{activeSessionTitle}</p>
+                        )}
                     </div>
                 </div>
                 {/* Voice Controls */}

@@ -20,6 +20,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
 
+            // Chat Sessions Table
+            db.run(`CREATE TABLE IF NOT EXISTS Chat_Sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
+
             // Sessions / Chat Logs
             db.run(`CREATE TABLE IF NOT EXISTS Sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,8 +37,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 content TEXT NOT NULL,
                 risk_level TEXT, -- 'LOW', 'MEDIUM', 'HIGH'
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+                session_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+                FOREIGN KEY (session_id) REFERENCES Chat_Sessions(id) ON DELETE CASCADE
             )`);
+
+            // Add session_id column for backwards compatibility with existing databases
+            db.run(`ALTER TABLE Sessions ADD COLUMN session_id INTEGER REFERENCES Chat_Sessions(id) ON DELETE CASCADE`, (err) => {
+                // Ignore error if column already exists
+            });
 
             // Mood Logs for Dashboard Analytics
             db.run(`CREATE TABLE IF NOT EXISTS Mood_Logs (

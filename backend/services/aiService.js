@@ -6,7 +6,6 @@ const CRISIS_KEYWORDS = [
 ];
 
 let genAI;
-let model;
 
 async function initAI() {
     if (genAI) return;
@@ -17,7 +16,6 @@ async function initAI() {
             throw new Error("GEMINI_API_KEY not found in environment variables");
         }
         genAI = new GoogleGenerativeAI(apiKey);
-        model = genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
         console.log("✅ Gemini API initialized");
     } catch (error) {
         console.error("❌ Gemini init failed:", error);
@@ -29,49 +27,56 @@ initAI();
 const detectRisk = (message) => {
     const text = message.toLowerCase();
 
-    if (CRISIS_KEYWORDS.some(k => text.includes(k))) {
+    const hasHighRisk = CRISIS_KEYWORDS.some(k => {
+        const regex = new RegExp(`\\b${k}\\b`, 'i');
+        return regex.test(text);
+    });
+    if (hasHighRisk) {
         return 'HIGH';
     }
 
     const mid = ['anxious', 'panic', 'overwhelmed', "can't breathe", 'depressed', 'sad'];
-    if (mid.some(k => text.includes(k))) {
+    const hasMidRisk = mid.some(k => {
+        const regex = new RegExp(`\\b${k}\\b`, 'i');
+        return regex.test(text);
+    });
+    if (hasMidRisk) {
         return 'MEDIUM';
     }
 
     return 'LOW';
 };
 
-const buildSystemPrompt = () => `You are SereneMind, a warm, compassionate, human-like emotional support counselor.
+const buildSystemPrompt = () => `You are SereneMind, a warm, professional, and empathetic therapist. Your approach is grounded in Person-Centered Therapy, Cognitive Behavioral Therapy (CBT), and mindfulness-based counseling.
 
 ROLE:
-- Be empathetic, calm, and non-judgmental.
-- Help the user feel heard, not fixed.
-- Focus on emotions, not solutions.
+- Provide a safe, non-judgmental space for emotional exploration and validation.
+- Practice active listening: reflect feelings, validate experiences, and encourage self-compassion.
+- Guide the user gently toward self-discovery, helping them reframe unhelpful thoughts or explore coping strategies.
 
 HOW TO RESPOND:
-- Always acknowledge the user's feelings first.
-- Reflect emotional meaning gently.
-- Keep replies VERY short (1-2 sentences max).
-- Ask at most ONE soft, open-ended question if helpful.
-- Sound natural and conversational.
+- Always respond in the EXACT same language that the user is using (e.g. English, Spanish, French, Urdu, Hindi, Arabic, Chinese, etc.).
+- Always acknowledge and validate the user's emotion first (e.g., "It sounds like you're carrying a lot of weight," or "That sounds incredibly stressful to navigate").
+- Keep responses short, concise, and natural (1-3 sentences max).
+- Ask exactly one open-ended, thought-provoking question to help them reflect further (e.g., "How does that thought make you feel about yourself?" or "What kind of support do you feel you need most right now?").
+- Maintain a warm, conversational, yet clinically sound therapeutic tone.
 
 STRICT RULES:
-- No bullet points, lists, or structured plans.
-- No "Thought:", "Plan:", or reasoning output.
-- No clinical or robotic tone.
-- No long explanations.
-- No diagnosis or medical advice.
-- Do not repeat the user's message verbatim.
+- Never offer quick fixes, unsolicited advice, or lists of instructions.
+- Do not make clinical diagnoses or prescribe medication.
+- Avoid sounding clinical, robotic, or overly structured.
+- Do not repeat the user's statements word-for-word.
+- Never output reasoning blocks, thoughts, plans, or bulleted lists.
 
-CRISIS RULE:
-If the user expresses self-harm or suicidal intent, override normal behavior, respond with urgency, and direct them to immediate help.`;
+CRISIS PROTOCOL:
+- If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines.`;
 
 const cleanOutput = (text) => {
     return text
         .replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '')
         .replace(/thought[\s\S]*?\n\n/i, '')
         .replace(/plan:[\s\S]*/i, '')
-        .replace(/^.*?(?=(I|It sounds|That feels|You))/i, '')
+        .replace(/^(?:SereneMind|Counselor|Counselor AI|Therapist|AI|System)\s*:\s*/i, '')
         .trim();
 };
 
@@ -88,7 +93,7 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
 
     await initAI();
 
-    if (!model) {
+    if (!genAI) {
         return {
             reply: "I'm having trouble connecting right now. Please try again shortly.",
             riskLevel,
@@ -102,11 +107,15 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
             parts: [{ text: msg.text || msg.content || "" }]
         }));
 
-        const chat = model.startChat({
+        const modelInstance = genAI.getGenerativeModel({
+            model: "gemini-3.5-flash",
+            systemInstruction: buildSystemPrompt()
+        });
+
+        const chat = modelInstance.startChat({
             history: chatHistory,
-            systemInstruction: buildSystemPrompt(),
             generationConfig: {
-                maxOutputTokens: 100,
+                maxOutputTokens: 1000,
                 temperature: 0.7,
                 topP: 0.9
             }
@@ -115,7 +124,6 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         const result = await chat.sendMessage(message);
         const response = await result.response;
         const raw = response.text();
-
         const reply = cleanOutput(raw) || "I hear you. Tell me more about that.";
 
         return {
@@ -138,7 +146,7 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
 const generatePatientReportMock = async (patient, moodLogs, recentSessions) => {
     await initAI();
 
-    if (!model) {
+    if (!genAI) {
         return {
             title: `AI Wellness Summary for ${patient.username}`,
             content: "AI service unavailable."
@@ -162,11 +170,15 @@ Risk: ${hasHighRisk ? "Recent HIGH risk detected" : "No recent high risk"}
 Write a short clinical summary.
 `;
 
-        const result = await model.generateContent({
+        const modelInstance = genAI.getGenerativeModel({
+            model: "gemini-3.5-flash",
+            systemInstruction: "You are an expert clinical therapist. Write an objective, concise, and professional mental health wellness summary of the patient's current psychological state, mood trends, and potential focus areas based on the provided session data."
+        });
+
+        const result = await modelInstance.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
-            systemInstruction: "You are a clinical therapist AI assistant. Be concise, objective, and professional.",
             generationConfig: {
-                maxOutputTokens: 150,
+                maxOutputTokens: 1000,
                 temperature: 0.3
             }
         });
