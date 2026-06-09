@@ -114,6 +114,12 @@ const Login = () => {
                         {isRegister ? 'Log In' : 'Sign Up'}
                     </button>
                 </div>
+
+                <div className="mt-4 text-center">
+                    <Link to="/doctor-login" className="text-sm font-semibold text-[#1B98E0] hover:text-[#1689C9] hover:underline transition-colors">
+                        Continue to the doctor portal
+                    </Link>
+                </div>
             </div>
         </div>
     );

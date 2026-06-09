@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, MessageSquare, Activity, Settings, LogOut, HeartPulse, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Home, MessageSquare, Activity, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Users, FileText } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -13,6 +13,9 @@ const Sidebar = () => {
     const [isCollapsed, setIsCollapsed] = useState(() => {
         return localStorage.getItem('sidebar_collapsed') === 'true';
     });
+    const userData = localStorage.getItem('serene_user');
+    const user = userData ? JSON.parse(userData) : null;
+    const isDoctor = user?.role === 'doctor';
 
     const activeSessionId = searchParams.get('session') ? parseInt(searchParams.get('session'), 10) : null;
 
@@ -33,10 +36,11 @@ const Sidebar = () => {
     };
 
     useEffect(() => {
+        if (isDoctor) return;
         fetchSessions();
         window.addEventListener('session-created', fetchSessions);
         return () => window.removeEventListener('session-created', fetchSessions);
-    }, []);
+    }, [isDoctor]);
 
     const handleNewSession = async (e) => {
         e.stopPropagation();
@@ -65,7 +69,7 @@ const Sidebar = () => {
     const handleLogout = () => {
         localStorage.removeItem('serene_token');
         localStorage.removeItem('serene_user');
-        navigate('/login');
+        navigate(isDoctor ? '/doctor-login' : '/login');
     };
 
     const toggleCollapse = () => {
@@ -85,21 +89,34 @@ const Sidebar = () => {
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
 
-            <div className="flex items-center gap-3 mb-10 px-2 mt-4 cursor-pointer overflow-hidden" onClick={() => navigate('/dashboard')}>
+            <div className="flex items-center gap-3 mb-10 px-2 mt-4 cursor-pointer overflow-hidden" onClick={() => navigate(isDoctor ? '/doctor' : '/dashboard')}>
                 <img src="/Serene Mind.svg" alt="SereneMind Logo" className="w-12 h-12 object-contain shrink-0" />
                 {!isCollapsed && <h1 className="text-xl font-bold tracking-tight text-[#0D1B2A] whitespace-nowrap">SereneMind</h1>}
             </div>
 
             <nav className="space-y-2">
-                <NavItem icon={<Home size={20} />} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} isCollapsed={isCollapsed} />
-                <NavItem icon={<MessageSquare size={20} />} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} isCollapsed={isCollapsed} />
-                <NavItem icon={<Activity size={20} />} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} isCollapsed={isCollapsed} />
-                <NavItem icon={<Settings size={20} />} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} isCollapsed={isCollapsed} />
+                {isDoctor ? (
+                    <>
+                        <NavItem icon={<Users size={20} />} label="Patient Overview" active={location.pathname === '/doctor'} onClick={() => navigate('/doctor')} isCollapsed={isCollapsed} />
+                        <NavItem icon={<FileText size={20} />} label="Clinical Reports" active={location.pathname === '/doctor'} onClick={() => navigate('/doctor')} isCollapsed={isCollapsed} />
+                    </>
+                ) : (
+                    <>
+                        <NavItem icon={<Home size={20} />} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} isCollapsed={isCollapsed} />
+                        <NavItem icon={<MessageSquare size={20} />} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} isCollapsed={isCollapsed} />
+                        <NavItem icon={<Activity size={20} />} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} isCollapsed={isCollapsed} />
+                        <NavItem icon={<Settings size={20} />} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} isCollapsed={isCollapsed} />
+                    </>
+                )}
             </nav>
 
             {/* Sessions Section (below settings) */}
             <div className="flex-1 flex flex-col min-h-0 border-t border-[#0E7C7B]/20 mt-4 pt-4 overflow-hidden">
-                {!isCollapsed ? (
+                {isDoctor ? (
+                    <div className={`rounded-2xl border border-[#0E7C7B]/10 bg-white/40 text-[#3D5A80] ${isCollapsed ? 'p-3 text-center text-xs' : 'p-4 text-sm leading-relaxed'}`}>
+                        {isCollapsed ? 'MD' : 'Review patient risk, mood history, and clinician notes from one place.'}
+                    </div>
+                ) : !isCollapsed ? (
                     <>
                         <div className="flex items-center justify-between mb-3 px-2">
                             <h3 className="text-xs font-bold text-[#3D5A80]/60 uppercase tracking-wider">Sessions</h3>

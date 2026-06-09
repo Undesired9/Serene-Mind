@@ -7,6 +7,20 @@ const { verifyToken } = require('../middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_serenemind_key_change_in_prod';
 
+const getRow = (sql, params = []) => new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+    });
+});
+
+const runStatement = (sql, params = []) => new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+        if (err) return reject(err);
+        resolve(this);
+    });
+});
+
 // Register User
 router.post('/register', (req, res) => {
     const { username, email, password } = req.body;
@@ -28,11 +42,11 @@ router.post('/register', (req, res) => {
         }
         
         // Auto login on register, explicitly setting needsAssessment to true
-        const token = jwt.sign({ id: this.lastID, username }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: this.lastID, username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
         res.status(201).json({
             message: 'User created successfully',
             token,
-            user: { id: this.lastID, username, email, needsAssessment: true }
+            user: { id: this.lastID, username, email, role: 'patient', needsAssessment: true }
         });
     });
 });
@@ -58,7 +72,7 @@ router.post('/login', (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, username: user.username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
         
         // Check if user has completed the assessment
         db.get(`SELECT id FROM Assessments WHERE user_id = ?`, [user.id], (err, assessment) => {
@@ -71,11 +85,102 @@ router.post('/login', (req, res) => {
                     id: user.id, 
                     username: user.username, 
                     email: user.email,
+                    role: 'patient',
                     needsAssessment: !assessment // true if no assessment found
                 }
             });
         });
     });
+});
+
+// Register Doctor
+router.post('/doctor/register', async (req, res) => {
+    const { fullName, email, password, specialization, licenseNumber } = req.body;
+
+    if (!fullName || !email || !password) {
+        return res.status(400).json({ error: 'Please provide full name, email, and password' });
+    }
+
+    try {
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(password, salt);
+
+        const result = await runStatement(
+            `INSERT INTO Doctors (full_name, email, password_hash, specialization, license_number) VALUES (?, ?, ?, ?, ?)`,
+            [fullName, email, passwordHash, specialization || '', licenseNumber || '']
+        );
+
+        const token = jwt.sign(
+            { id: result.lastID, fullName, email, role: 'doctor' },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.status(201).json({
+            message: 'Doctor account created successfully',
+            token,
+            user: {
+                id: result.lastID,
+                fullName,
+                email,
+                specialization: specialization || '',
+                licenseNumber: licenseNumber || '',
+                role: 'doctor',
+                needsAssessment: false
+            }
+        });
+    } catch (err) {
+        if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ error: 'A doctor account with this email already exists' });
+        }
+
+        console.error('Doctor registration error:', err);
+        res.status(500).json({ error: 'Doctor registration failed' });
+    }
+});
+
+// Login Doctor
+router.post('/doctor/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Please provide email and password' });
+    }
+
+    try {
+        const doctor = await getRow(`SELECT * FROM Doctors WHERE email = ?`, [email]);
+        if (!doctor) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const isValidPassword = bcrypt.compareSync(password, doctor.password_hash);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const token = jwt.sign(
+            { id: doctor.id, fullName: doctor.full_name, email: doctor.email, role: 'doctor' },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            message: 'Doctor login successful',
+            token,
+            user: {
+                id: doctor.id,
+                fullName: doctor.full_name,
+                email: doctor.email,
+                specialization: doctor.specialization || '',
+                licenseNumber: doctor.license_number || '',
+                role: 'doctor',
+                needsAssessment: false
+            }
+        });
+    } catch (err) {
+        console.error('Doctor login error:', err);
+        res.status(500).json({ error: 'Doctor login failed' });
+    }
 });
 
 // Delete User Account (Data Autonomy/Privacy)

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/sqlite');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireDoctor } = require('../middleware/auth');
 
 // POST /api/reports - Create a new patient report (Doctor only)
-router.post('/', verifyToken, (req, res) => {
+router.post('/', verifyToken, requireDoctor, (req, res) => {
     const { patient_id, report_title, report_content, status } = req.body;
-    const doctor_id = req.user.id; // Assuming verifyToken adds user to req and it's a doctor
+    const doctor_id = req.user.id;
 
     if (!patient_id || !report_title || !report_content) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -23,13 +23,13 @@ router.post('/', verifyToken, (req, res) => {
 });
 
 // GET /api/reports/patient/:patient_id - Get all reports for a specific patient
-router.get('/patient/:patient_id', verifyToken, (req, res) => {
+router.get('/patient/:patient_id', verifyToken, requireDoctor, (req, res) => {
     const patient_id = req.params.patient_id;
 
     const sql = `
-        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, d.username as doctor_name 
+        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, r.updated_at, d.full_name as doctor_name 
         FROM Patient_Reports r
-        JOIN Doctors d ON r.doctor_id = d.id
+        LEFT JOIN Doctors d ON r.doctor_id = d.id
         WHERE r.patient_id = ?
         ORDER BY r.created_at DESC
     `;
@@ -44,11 +44,11 @@ router.get('/patient/:patient_id', verifyToken, (req, res) => {
 });
 
 // GET /api/reports/doctor - Get all reports created by the logged-in doctor
-router.get('/doctor', verifyToken, (req, res) => {
+router.get('/doctor', verifyToken, requireDoctor, (req, res) => {
     const doctor_id = req.user.id;
 
     const sql = `
-        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, u.username as patient_name 
+        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, r.updated_at, u.username as patient_name 
         FROM Patient_Reports r
         JOIN Users u ON r.patient_id = u.id
         WHERE r.doctor_id = ?
@@ -65,15 +65,15 @@ router.get('/doctor', verifyToken, (req, res) => {
 });
 
 // GET /api/reports/:id - Get a specific report by ID
-router.get('/:id', verifyToken, (req, res) => {
+router.get('/:id', verifyToken, requireDoctor, (req, res) => {
     const report_id = req.params.id;
 
     const sql = `
-        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, 
-               u.username as patient_name, d.username as doctor_name
+        SELECT r.id, r.patient_id, r.doctor_id, r.report_title, r.report_content, r.status, r.created_at, r.updated_at,
+               u.username as patient_name, d.full_name as doctor_name
         FROM Patient_Reports r
         JOIN Users u ON r.patient_id = u.id
-        JOIN Doctors d ON r.doctor_id = d.id
+        LEFT JOIN Doctors d ON r.doctor_id = d.id
         WHERE r.id = ?
     `;
     
@@ -89,13 +89,16 @@ router.get('/:id', verifyToken, (req, res) => {
 });
 
 // PUT /api/reports/:id - Update an existing report
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, requireDoctor, (req, res) => {
     const report_id = req.params.id;
     const { report_title, report_content, status } = req.body;
-    const doctor_id = req.user.id; // Assuming only the doctor who created it can update it
+    const doctor_id = req.user.id;
 
-    // Check if the report belongs to the doctor (optional authorization step)
-    const updateSql = `UPDATE Patient_Reports SET report_title = ?, report_content = ?, status = ? WHERE id = ? AND doctor_id = ?`;
+    const updateSql = `
+        UPDATE Patient_Reports
+        SET report_title = ?, report_content = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND doctor_id = ?
+    `;
 
     db.run(updateSql, [report_title, report_content, status, report_id, doctor_id], function(err) {
         if (err) {
@@ -110,9 +113,9 @@ router.put('/:id', verifyToken, (req, res) => {
 });
 
 // DELETE /api/reports/:id - Delete a report
-router.delete('/:id', verifyToken, (req, res) => {
+router.delete('/:id', verifyToken, requireDoctor, (req, res) => {
     const report_id = req.params.id;
-    const doctor_id = req.user.id; // Only the doctor who created it can delete
+    const doctor_id = req.user.id;
 
     const deleteSql = `DELETE FROM Patient_Reports WHERE id = ? AND doctor_id = ?`;
     

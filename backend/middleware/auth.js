@@ -18,4 +18,12 @@ const verifyToken = (req, res, next) => {
     }
 };
 
-module.exports = { verifyToken };
+const requireDoctor = (req, res, next) => {
+    if (!req.user || req.user.role !== 'doctor') {
+        return res.status(403).json({ error: 'Doctor access is required.' });
+    }
+
+    next();
+};
+
+module.exports = { verifyToken, requireDoctor };

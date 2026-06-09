@@ -9,6 +9,7 @@ import Settings from './components/Settings';
 import Assessment from './components/Assessment';
 import LandingPage from './components/landing/LandingPage';
 import DoctorDashboard from './components/DoctorDashboard';
+import DoctorLogin from './components/DoctorLogin';
 
 // A protective wrapper that also enforces the Assessment requirement
 const ProtectedRoute = ({ children }) => {
@@ -20,6 +21,10 @@ const ProtectedRoute = ({ children }) => {
   }
 
   const user = JSON.parse(userStr);
+
+  if (user.role === 'doctor') {
+    return <Navigate to="/doctor" replace />;
+  }
   
   // Intercept and force assessment
   if (user.needsAssessment) {
@@ -37,6 +42,9 @@ const AssessmentRoute = ({ children }) => {
   if (!token || !userStr) return <Navigate to="/login" replace />;
   
   const user = JSON.parse(userStr);
+  if (user.role === 'doctor') {
+      return <Navigate to="/doctor" replace />;
+  }
   if (!user.needsAssessment) {
       return <Navigate to="/dashboard" replace />;
   }
@@ -74,6 +82,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/doctor-login" element={<DoctorLogin />} />
         
         {/* Assessment Route */}
         <Route path="/assessment" element={
