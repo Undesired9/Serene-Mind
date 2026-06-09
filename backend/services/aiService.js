@@ -7,6 +7,20 @@ const CRISIS_KEYWORDS = [
 
 let genAI;
 
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const FALLBACK_MODELS = [
+    ...new Set(
+        (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.0-flash')
+            .split(',')
+            .map((model) => model.trim())
+            .filter(Boolean)
+            .filter((model) => model !== PRIMARY_MODEL)
+    )
+];
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRIES = Math.max(0, Number(process.env.GEMINI_MAX_RETRIES || 2));
+const BASE_RETRY_DELAY_MS = Math.max(200, Number(process.env.GEMINI_RETRY_DELAY_MS || 700));
+
 async function initAI() {
     if (genAI) return;
 
@@ -80,6 +94,75 @@ const cleanOutput = (text) => {
         .trim();
 };
 
+const sanitizeHistoryForGemini = (history = []) => {
+    const normalizedHistory = history
+        .map((msg) => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            text: (msg.text || msg.content || '').trim()
+        }))
+        .filter((msg) => msg.text)
+        .map((msg) => ({
+            role: msg.role,
+            parts: [{ text: msg.text }]
+        }));
+
+    while (normalizedHistory.length > 0 && normalizedHistory[0].role !== 'user') {
+        normalizedHistory.shift();
+    }
+
+    return normalizedHistory;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableGeminiError = (error) => {
+    const status = error?.status;
+    const message = `${error?.message || ''} ${error?.statusText || ''}`.toLowerCase();
+
+    return RETRYABLE_STATUS_CODES.has(status) ||
+        message.includes('service unavailable') ||
+        message.includes('high demand') ||
+        message.includes('temporarily unavailable') ||
+        message.includes('overloaded');
+};
+
+const getRetryDelay = (attempt) =>
+    BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
+
+const runWithModelResilience = async (runner) => {
+    const modelsToTry = [PRIMARY_MODEL, ...FALLBACK_MODELS];
+    let lastError;
+
+    for (const modelName of modelsToTry) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+            try {
+                return await runner(modelName);
+            } catch (error) {
+                lastError = error;
+                const canRetrySameModel = isRetryableGeminiError(error) && attempt < MAX_RETRIES;
+
+                if (canRetrySameModel) {
+                    const delay = getRetryDelay(attempt);
+                    console.warn(`Gemini request failed on ${modelName} (attempt ${attempt + 1}). Retrying in ${delay}ms...`, {
+                        status: error?.status,
+                        statusText: error?.statusText
+                    });
+                    await sleep(delay);
+                    continue;
+                }
+
+                console.warn(`Gemini request failed on ${modelName}.`, {
+                    status: error?.status,
+                    statusText: error?.statusText
+                });
+                break;
+            }
+        }
+    }
+
+    throw lastError;
+};
+
 const handleChat = async (message, history = [], onTextChunk = null) => {
     const riskLevel = detectRisk(message);
 
@@ -102,28 +185,26 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
     }
 
     try {
-        const chatHistory = history.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text || msg.content || "" }]
-        }));
+        const chatHistory = sanitizeHistoryForGemini(history);
+        const raw = await runWithModelResilience(async (modelName) => {
+            const modelInstance = genAI.getGenerativeModel({
+                model: modelName,
+                systemInstruction: buildSystemPrompt()
+            });
 
-        const modelInstance = genAI.getGenerativeModel({
-            model: "gemini-3.5-flash",
-            systemInstruction: buildSystemPrompt()
+            const chat = modelInstance.startChat({
+                history: chatHistory,
+                generationConfig: {
+                    maxOutputTokens: 1000,
+                    temperature: 0.7,
+                    topP: 0.9
+                }
+            });
+
+            const result = await chat.sendMessage(message);
+            const response = await result.response;
+            return response.text();
         });
-
-        const chat = modelInstance.startChat({
-            history: chatHistory,
-            generationConfig: {
-                maxOutputTokens: 1000,
-                temperature: 0.7,
-                topP: 0.9
-            }
-        });
-
-        const result = await chat.sendMessage(message);
-        const response = await result.response;
-        const raw = response.text();
         const reply = cleanOutput(raw) || "I hear you. Tell me more about that.";
 
         return {
@@ -170,21 +251,23 @@ Risk: ${hasHighRisk ? "Recent HIGH risk detected" : "No recent high risk"}
 Write a short clinical summary.
 `;
 
-        const modelInstance = genAI.getGenerativeModel({
-            model: "gemini-3.5-flash",
-            systemInstruction: "You are an expert clinical therapist. Write an objective, concise, and professional mental health wellness summary of the patient's current psychological state, mood trends, and potential focus areas based on the provided session data."
-        });
+        const content = await runWithModelResilience(async (modelName) => {
+            const modelInstance = genAI.getGenerativeModel({
+                model: modelName,
+                systemInstruction: "You are an expert clinical therapist. Write an objective, concise, and professional mental health wellness summary of the patient's current psychological state, mood trends, and potential focus areas based on the provided session data."
+            });
 
-        const result = await modelInstance.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                maxOutputTokens: 1000,
-                temperature: 0.3
-            }
-        });
+            const result = await modelInstance.generateContent({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    maxOutputTokens: 1000,
+                    temperature: 0.3
+                }
+            });
 
-        const response = await result.response;
-        const content = response.text();
+            const response = await result.response;
+            return response.text();
+        });
 
         return {
             title: `AI Wellness Summary for ${patient.username}`,
