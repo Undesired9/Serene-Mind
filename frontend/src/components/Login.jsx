@@ -1,26 +1,47 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { authConstraints, validateLoginForm, validateRegisterForm } from '../utils/authValidation';
 
 const Login = () => {
     const navigate = useNavigate();
     const [isRegister, setIsRegister] = useState(false);
-    const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+    const [formData, setFormData] = useState({ username: '', email: '', identifier: '', password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        const validationError = isRegister
+            ? validateRegisterForm(formData)
+            : validateLoginForm(formData);
+
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
         setLoading(true);
 
         const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+        const payload = isRegister
+            ? {
+                username: formData.username.trim(),
+                email: formData.email.trim(),
+                password: formData.password,
+                confirmPassword: formData.confirmPassword
+            }
+            : {
+                identifier: formData.identifier.trim(),
+                password: formData.password
+            };
 
         try {
             const response = await fetch(`http://localhost:5000${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -69,32 +90,79 @@ const Login = () => {
                             <input
                                 type="text"
                                 required
+                                minLength={3}
+                                maxLength={24}
+                                pattern="[A-Za-z0-9._-]+"
+                                autoComplete="username"
+                                placeholder="mindful_user"
                                 className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
                                 value={formData.username}
                                 onChange={e => setFormData({ ...formData, username: e.target.value })}
                             />
+                            <p className="text-xs text-[#3D5A80] mt-1">{authConstraints.username}</p>
                         </div>
                     )}
-                    <div>
-                        <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Email</label>
-                        <input
-                            type="email"
-                            required
-                            className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
-                            value={formData.email}
-                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        />
-                    </div>
+                    {isRegister ? (
+                        <div>
+                            <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Email</label>
+                            <input
+                                type="email"
+                                required
+                                maxLength={254}
+                                autoComplete="email"
+                                placeholder="you@example.com"
+                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                value={formData.email}
+                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Username or email</label>
+                            <input
+                                type="text"
+                                required
+                                minLength={3}
+                                maxLength={254}
+                                autoComplete="username"
+                                placeholder="Username or email"
+                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                value={formData.identifier}
+                                onChange={e => setFormData({ ...formData, identifier: e.target.value })}
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Password</label>
                         <input
                             type="password"
                             required
+                            minLength={8}
+                            maxLength={64}
+                            autoComplete={isRegister ? 'new-password' : 'current-password'}
+                            placeholder={isRegister ? 'Create a strong password' : 'Enter your password'}
                             className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
                             value={formData.password}
                             onChange={e => setFormData({ ...formData, password: e.target.value })}
                         />
+                        {isRegister && <p className="text-xs text-[#3D5A80] mt-1">{authConstraints.password}</p>}
                     </div>
+                    {isRegister && (
+                        <div>
+                            <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Confirm password</label>
+                            <input
+                                type="password"
+                                required
+                                minLength={8}
+                                maxLength={64}
+                                autoComplete="new-password"
+                                placeholder="Re-enter your password"
+                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                value={formData.confirmPassword}
+                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            />
+                        </div>
+                    )}
 
                     <button
                         type="submit"

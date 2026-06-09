@@ -54,23 +54,28 @@ router.get('/patients/:id', verifyToken, requireDoctor, (req, res) => {
         db.get(`SELECT * FROM Assessments WHERE user_id = ?`, [patientId], (err, assessment) => {
             if (err) return res.status(500).json({ error: 'Database error fetching assessment' });
 
-            // Fetch recent mood logs (last 30 entries)
-            db.all(`SELECT id, mood_score, notes, date FROM Mood_Logs WHERE user_id = ? ORDER BY date DESC LIMIT 30`, [patientId], (err, mood_logs) => {
-                if (err) return res.status(500).json({ error: 'Database error fetching mood logs' });
+            db.get(`SELECT * FROM Patient_Intake WHERE user_id = ?`, [patientId], (err, intake) => {
+                if (err) return res.status(500).json({ error: 'Database error fetching intake form' });
 
-                // Fetch recent chat sessions overview to show risk levels (excluding content for privacy, except maybe risk tags)
-                db.all(`SELECT id, sender, risk_level, timestamp FROM Sessions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`, [patientId], (err, sessions) => {
-                    if (err) return res.status(500).json({ error: 'Database error fetching sessions' });
+                // Fetch recent mood logs (last 30 entries)
+                db.all(`SELECT id, mood_score, notes, date FROM Mood_Logs WHERE user_id = ? ORDER BY date DESC LIMIT 30`, [patientId], (err, mood_logs) => {
+                    if (err) return res.status(500).json({ error: 'Database error fetching mood logs' });
 
-                    res.json({
-                        user,
-                        assessment: assessment ? {
-                            ...assessment,
-                            severity: getSeverity(assessment.total_score),
-                            crisis_risk: !!assessment.self_harm_risk
-                        } : null,
-                        mood_logs: mood_logs || [],
-                        sessions: sessions || []
+                    // Fetch recent chat sessions overview to show risk levels (excluding content for privacy, except maybe risk tags)
+                    db.all(`SELECT id, sender, risk_level, timestamp FROM Sessions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`, [patientId], (err, sessions) => {
+                        if (err) return res.status(500).json({ error: 'Database error fetching sessions' });
+
+                        res.json({
+                            user,
+                            intake: intake || null,
+                            assessment: assessment ? {
+                                ...assessment,
+                                severity: getSeverity(assessment.total_score),
+                                crisis_risk: !!assessment.self_harm_risk
+                            } : null,
+                            mood_logs: mood_logs || [],
+                            sessions: sessions || []
+                        });
                     });
                 });
             });

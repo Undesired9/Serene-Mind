@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { authConstraints, validateLoginForm, validateRegisterForm } from '../utils/authValidation';
 
 const styles = {
   page: {
@@ -157,6 +158,12 @@ const styles = {
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
   },
+  helperText: {
+    fontSize: '11px',
+    color: 'rgba(255,255,255,0.38)',
+    lineHeight: 1.45,
+    marginTop: '4px',
+  },
   inputWrap: {
     position: 'relative',
     display: 'flex',
@@ -291,8 +298,11 @@ const DoctorLogin = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
+    username: '',
     email: '',
+    identifier: '',
     password: '',
+    confirmPassword: '',
     specialization: '',
     licenseNumber: '',
   });
@@ -304,13 +314,36 @@ const DoctorLogin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const validationError = isRegister
+      ? validateRegisterForm(formData, { isDoctor: true })
+      : validateLoginForm(formData);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
     const endpoint = isRegister ? '/api/auth/doctor/register' : '/api/auth/doctor/login';
+    const payload = isRegister
+      ? {
+          fullName: formData.fullName.trim(),
+          username: formData.username.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+          specialization: formData.specialization.trim(),
+          licenseNumber: formData.licenseNumber.trim(),
+        }
+      : {
+          identifier: formData.identifier.trim(),
+          password: formData.password,
+        };
     try {
       const res = await fetch(`http://localhost:5000${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
@@ -407,23 +440,73 @@ const DoctorLogin = () => {
               </div>
             )}
 
-            <div style={styles.field}>
-              <label style={styles.label}>Email</label>
-              <div style={styles.inputWrap}>
-                <span style={styles.inputIcon}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                </span>
-                <input
-                  type="email"
-                  required
-                  placeholder="doctor@hospital.com"
-                  className="doc-input"
-                  style={styles.input}
-                  value={formData.email}
-                  onChange={e => update('email', e.target.value)}
-                />
+            {isRegister && (
+              <div style={styles.field}>
+                <label style={styles.label}>Username</label>
+                <div style={styles.inputWrap}>
+                  <span style={styles.inputIcon}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    minLength={3}
+                    maxLength={24}
+                    pattern="[A-Za-z0-9._-]+"
+                    autoComplete="username"
+                    placeholder="dr_smith"
+                    className="doc-input"
+                    style={styles.input}
+                    value={formData.username}
+                    onChange={e => update('username', e.target.value)}
+                  />
+                </div>
+                <div style={styles.helperText}>{authConstraints.username}</div>
               </div>
-            </div>
+            )}
+
+            {isRegister ? (
+              <div style={styles.field}>
+                <label style={styles.label}>Email</label>
+                <div style={styles.inputWrap}>
+                  <span style={styles.inputIcon}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    maxLength={254}
+                    autoComplete="email"
+                    placeholder="doctor@hospital.com"
+                    className="doc-input"
+                    style={styles.input}
+                    value={formData.email}
+                    onChange={e => update('email', e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={styles.field}>
+                <label style={styles.label}>Username or Email</label>
+                <div style={styles.inputWrap}>
+                  <span style={styles.inputIcon}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M12 12h.01"/></svg>
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    minLength={3}
+                    maxLength={254}
+                    autoComplete="username"
+                    placeholder="Username or email"
+                    className="doc-input"
+                    style={styles.input}
+                    value={formData.identifier}
+                    onChange={e => update('identifier', e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
             <div style={styles.field}>
               <label style={styles.label}>Password</label>
@@ -434,6 +517,9 @@ const DoctorLogin = () => {
                 <input
                   type="password"
                   required
+                  minLength={8}
+                  maxLength={64}
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
                   placeholder="••••••••"
                   className="doc-input"
                   style={styles.input}
@@ -441,10 +527,32 @@ const DoctorLogin = () => {
                   onChange={e => update('password', e.target.value)}
                 />
               </div>
+              {isRegister && <div style={styles.helperText}>{authConstraints.password}</div>}
             </div>
 
             {isRegister && (
               <>
+                <div style={styles.field}>
+                  <label style={styles.label}>Confirm Password</label>
+                  <div style={styles.inputWrap}>
+                    <span style={styles.inputIcon}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </span>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      maxLength={64}
+                      autoComplete="new-password"
+                      placeholder="Re-enter password"
+                      className="doc-input"
+                      style={styles.input}
+                      value={formData.confirmPassword}
+                      onChange={e => update('confirmPassword', e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div style={styles.field}>
                   <label style={styles.label}>Specialization</label>
                   <div style={styles.inputWrap}>
@@ -453,6 +561,7 @@ const DoctorLogin = () => {
                     </span>
                     <input
                       type="text"
+                      maxLength={80}
                       placeholder="e.g. Psychiatry, Psychology"
                       className="doc-input"
                       style={styles.input}
@@ -470,6 +579,7 @@ const DoctorLogin = () => {
                     </span>
                     <input
                       type="text"
+                      maxLength={40}
                       placeholder="Medical license ID"
                       className="doc-input"
                       style={styles.input}
