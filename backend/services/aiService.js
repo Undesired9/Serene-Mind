@@ -2,7 +2,17 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const CRISIS_KEYWORDS = [
-    'suicide', 'kill', 'end my life', 'hurt myself', 'die', 'self-harm'
+    'suicide', 'kill myself', 'end my life', 'hurt myself', 'die', 'self-harm',
+    'want to die', 'no reason to live', 'can\'t go on', 'give up'
+];
+
+const HIGH_RISK_KEYWORDS = [
+    'depressed', 'hopeless', 'overwhelmed', 'can\'t cope', 'worthless',
+    'panic attack', 'anxious', 'terrified', 'scared'
+];
+
+const MEDIUM_RISK_KEYWORDS = [
+    'sad', 'stressed', 'worried', 'upset', 'frustrated', 'angry', 'tired'
 ];
 
 let genAI;
@@ -24,27 +34,51 @@ async function initAI() {
 
 initAI();
 
+const getRiskTier = (score) => {
+    if (score >= 90) return 'CRITICAL';
+    if (score >= 66) return 'HIGH';
+    if (score >= 31) return 'ELEVATED';
+    return 'ROUTINE';
+};
+
+const getRiskLevelFromTier = (tier) => {
+    if (tier === 'CRITICAL' || tier === 'HIGH') return 'HIGH';
+    if (tier === 'ELEVATED') return 'MEDIUM';
+    return 'LOW';
+};
+
 const detectRisk = (message) => {
     const text = message.toLowerCase();
+    let score = 0;
 
-    const hasHighRisk = CRISIS_KEYWORDS.some(k => {
+    // Check for crisis keywords first (highest priority)
+    const hasCrisis = CRISIS_KEYWORDS.some(k => {
         const regex = new RegExp(`\\b${k}\\b`, 'i');
         return regex.test(text);
     });
-    if (hasHighRisk) {
-        return 'HIGH';
+    if (hasCrisis) {
+        return { score: 95, tier: 'CRITICAL' };
     }
 
-    const mid = ['anxious', 'panic', 'overwhelmed', "can't breathe", 'depressed', 'sad'];
-    const hasMidRisk = mid.some(k => {
+    // Check for high risk keywords
+    const highRiskCount = HIGH_RISK_KEYWORDS.filter(k => {
         const regex = new RegExp(`\\b${k}\\b`, 'i');
         return regex.test(text);
-    });
-    if (hasMidRisk) {
-        return 'MEDIUM';
-    }
+    }).length;
+    score += highRiskCount * 15;
 
-    return 'LOW';
+    // Check for medium risk keywords
+    const mediumRiskCount = MEDIUM_RISK_KEYWORDS.filter(k => {
+        const regex = new RegExp(`\\b${k}\\b`, 'i');
+        return regex.test(text);
+    }).length;
+    score += mediumRiskCount * 8;
+
+    // Cap the score at 89 (since 90+ is CRITICAL)
+    score = Math.min(score, 89);
+
+    const tier = getRiskTier(score);
+    return { score, tier };
 };
 
 const buildSystemPrompt = () => `You are SereneMind, a warm, professional, and empathetic therapist. Your approach is grounded in Person-Centered Therapy, Cognitive Behavioral Therapy (CBT), and mindfulness-based counseling.
@@ -55,7 +89,7 @@ ROLE:
 - Guide the user gently toward self-discovery, helping them reframe unhelpful thoughts or explore coping strategies.
 
 HOW TO RESPOND:
-- Always respond in the EXACT same language that the user is using (e.g. English, Spanish, French, Urdu, Hindi, Arabic, Chinese, etc.).
+- Always respond in the EXACT same language that the user is using (e.g., English, Spanish, French, Urdu, Hindi, Arabic, Chinese, etc.).
 - Always acknowledge and validate the user's emotion first (e.g., "It sounds like you're carrying a lot of weight," or "That sounds incredibly stressful to navigate").
 - Keep responses short, concise, and natural (1-3 sentences max).
 - Ask exactly one open-ended, thought-provoking question to help them reflect further (e.g., "How does that thought make you feel about yourself?" or "What kind of support do you feel you need most right now?").
@@ -81,12 +115,15 @@ const cleanOutput = (text) => {
 };
 
 const handleChat = async (message, history = [], onTextChunk = null) => {
-    const riskLevel = detectRisk(message);
+    const { score: riskScore, tier: riskTier } = detectRisk(message);
+    const riskLevel = getRiskLevelFromTier(riskTier);
 
-    if (riskLevel === 'HIGH') {
+    if (riskTier === 'CRITICAL') {
         return {
             reply: "I’m really sorry you’re feeling this way. Please reach out to a trusted person or your local emergency service right now—you don’t have to face this alone.",
-            riskLevel: 'HIGH',
+            riskLevel,
+            riskScore,
+            riskTier,
             isCrisis: true
         };
     }
@@ -97,6 +134,8 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         return {
             reply: "I'm having trouble connecting right now. Please try again shortly.",
             riskLevel,
+            riskScore,
+            riskTier,
             isCrisis: false
         };
     }
@@ -129,6 +168,8 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         return {
             reply,
             riskLevel,
+            riskScore,
+            riskTier,
             isCrisis: false
         };
 
@@ -138,6 +179,8 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         return {
             reply: "I’m here with you—could you say that again?",
             riskLevel,
+            riskScore,
+            riskTier,
             isCrisis: false
         };
     }
@@ -204,5 +247,7 @@ Write a short clinical summary.
 module.exports = {
     handleChat,
     detectRisk,
+    getRiskTier,
+    getRiskLevelFromTier,
     generatePatientReportMock
 };

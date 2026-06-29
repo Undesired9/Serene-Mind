@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ClipboardList, Clock, FileText, Heart, MessageSquare, Search, ShieldCheck, Users, X } from 'lucide-react';
+import { AlertTriangle, Calendar, ClipboardList, Clock, FileText, Heart, MessageSquare, Search, ShieldCheck, Users, X } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -44,6 +44,7 @@ const StatCard = ({ icon, label, value, tone }) => (
 
 const DoctorDashboard = () => {
     const [patients, setPatients] = useState([]);
+    const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -82,8 +83,22 @@ const DoctorDashboard = () => {
         }
     };
 
+    const fetchAppointments = async () => {
+        try {
+            const response = await authFetch('/api/appointments/doctor-appointments');
+            const data = await response.json();
+
+            if (response.ok) {
+                setAppointments(data);
+            }
+        } catch (fetchError) {
+            console.error('Failed to fetch appointments', fetchError);
+        }
+    };
+
     useEffect(() => {
         fetchPatients();
+        fetchAppointments();
     }, []);
 
     const filteredPatients = useMemo(() => {
@@ -228,6 +243,21 @@ const DoctorDashboard = () => {
         }
     };
 
+    const handleUpdateAppointmentStatus = async (appointmentId, status) => {
+        try {
+            const response = await authFetch(`/api/appointments/${appointmentId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (response.ok) {
+                fetchAppointments();
+            }
+        } catch (error) {
+            console.error('Failed to update appointment status', error);
+        }
+    };
+
     return (
         <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10">
             <div className="max-w-7xl mx-auto space-y-8">
@@ -245,6 +275,64 @@ const DoctorDashboard = () => {
                     <StatCard icon={<Users className="text-[#0E7C7B]" />} label="Patients in care" value={patients.length} tone="bg-[#C2FFF0]/40 border-[#0E7C7B]/10 text-[#0E7C7B]" />
                     <StatCard icon={<AlertTriangle className="text-rose-600" />} label="Self-harm risk flags" value={dashboardStats.highRisk} tone="bg-rose-50 border-rose-100 text-rose-600" />
                     <StatCard icon={<Heart className="text-[#1B98E0]" />} label="Average logged mood" value={dashboardStats.avgMood === '--' ? '--' : `${dashboardStats.avgMood}/10`} tone="bg-sky-50 border-sky-100 text-[#1B98E0]" />
+                </div>
+
+                {/* Appointments Section */}
+                <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
+                    <h2 className="text-lg font-semibold text-[#0D1B2A] mb-4 flex items-center gap-2">
+                        <Calendar className="text-[#0E7C7B]" size={20} />
+                        Upcoming Appointments
+                    </h2>
+                    {appointments.length === 0 ? (
+                        <p className="text-[#3D5A80] text-sm">No upcoming appointments</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {appointments.map((appointment) => (
+                                <div key={appointment.id} className="bg-white p-4 rounded-2xl border border-[#0E7C7B]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="font-semibold text-[#0D1B2A]">{appointment.patient_name}</h3>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                appointment.risk_tier === 'CRITICAL' || appointment.risk_tier === 'HIGH' 
+                                                ? 'bg-rose-100 text-rose-700' 
+                                                : appointment.risk_tier === 'ELEVATED' 
+                                                ? 'bg-amber-100 text-amber-700' 
+                                                : 'bg-emerald-100 text-emerald-700'
+                                            }`}>
+                                                {appointment.risk_tier} Risk
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-[#3D5A80] flex items-center gap-1">
+                                            <Clock size={14} />
+                                            {formatDateTime(appointment.appointment_datetime)}
+                                        </p>
+                                        {appointment.notes && (
+                                            <p className="text-xs text-[#3D5A80] mt-1">{appointment.notes}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-[#3D5A80] uppercase">{appointment.status}</span>
+                                        {appointment.status === 'SCHEDULED' && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleUpdateAppointmentStatus(appointment.id, 'COMPLETED')}
+                                                    className="text-xs bg-emerald-500 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition"
+                                                >
+                                                    Complete
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdateAppointmentStatus(appointment.id, 'CANCELLED')}
+                                                    className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-300 transition"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">

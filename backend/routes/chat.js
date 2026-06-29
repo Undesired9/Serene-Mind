@@ -39,6 +39,66 @@ async function getOrCreateTodaySession(userId) {
     });
 }
 
+// Helper to get or create user escalation status
+async function getOrCreateUserEscalationStatus(userId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT * FROM User_Escalation_Status WHERE user_id = ?`,
+            [userId],
+            (err, row) => {
+                if (err) return reject(err);
+                if (row) {
+                    resolve(row);
+                } else {
+                    db.run(
+                        `INSERT INTO User_Escalation_Status (user_id) VALUES (?)`,
+                        [userId],
+                        function(err) {
+                            if (err) return reject(err);
+                            db.get(
+                                `SELECT * FROM User_Escalation_Status WHERE id = ?`,
+                                [this.lastID],
+                                (err, newRow) => {
+                                    if (err) return reject(err);
+                                    resolve(newRow);
+                                }
+                            );
+                        }
+                    );
+                }
+            }
+        );
+    });
+}
+
+// Helper to update user escalation status
+async function updateUserEscalationStatus(userId, riskScore, riskTier, isChatLocked) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `UPDATE User_Escalation_Status 
+             SET current_risk_score = ?, current_risk_tier = ?, is_chat_locked = ?, last_escalation_timestamp = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = ?`,
+            [riskScore, riskTier, isChatLocked ? 1 : 0, userId],
+            function(err) {
+                if (err) return reject(err);
+                resolve();
+            }
+        );
+    });
+}
+
+// GET: Fetch user's escalation status
+router.get('/escalation-status', verifyToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const status = await getOrCreateUserEscalationStatus(userId);
+        res.json(status);
+    } catch (err) {
+        console.error('Failed to get escalation status:', err);
+        res.status(500).json({ error: 'Failed to get escalation status' });
+    }
+});
+
 // GET: Fetch all sessions for a user
 router.get('/sessions', verifyToken, (req, res) => {
     const userId = req.user.id;
@@ -160,6 +220,15 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     try {
+        // Check if user's chat is locked
+        const escalationStatus = await getOrCreateUserEscalationStatus(userId);
+        if (escalationStatus.is_chat_locked) {
+            return res.status(403).json({ 
+                error: 'Chat is locked. Please book an appointment first.',
+                escalationStatus 
+            });
+        }
+
         if (!sessionId) {
             sessionId = await getOrCreateTodaySession(userId);
         }
@@ -174,21 +243,35 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 2. Process via AI service (NLP mock with Crisis bounds)
+        // 2. Process via AI service
         const responseData = await handleChat(message, history);
         
         // 3. Save AI's response to SQL DB
         await new Promise((resolve, reject) => {
-            db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, session_id) VALUES (?, 'ai', ?, ?, ?)`, 
-            [userId, responseData.reply, responseData.riskLevel, sessionId], 
+            db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
+            [userId, responseData.reply, responseData.riskLevel, responseData.riskScore, sessionId], 
             function(err) {
                 if (err) reject(err);
                 resolve();
             });
         });
 
-        // 4. Return response
-        res.json({ ...responseData, sessionId });
+        // 4. Update user's escalation status and lock chat if needed
+        const shouldLockChat = responseData.riskTier === 'HIGH' || responseData.riskTier === 'CRITICAL';
+        await updateUserEscalationStatus(
+            userId, 
+            responseData.riskScore, 
+            responseData.riskTier, 
+            shouldLockChat
+        );
+
+        // 5. Return response with updated escalation status
+        const updatedEscalationStatus = await getOrCreateUserEscalationStatus(userId);
+        res.json({ 
+            ...responseData, 
+            sessionId,
+            escalationStatus: updatedEscalationStatus
+        });
     } catch (error) {
         console.error('Chat routing error:', error);
         res.status(500).json({ error: 'An error occurred while communicating with the AI Therapist' });
