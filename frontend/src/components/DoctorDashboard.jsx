@@ -19,6 +19,109 @@ const severityClass = (severity) => {
     return 'text-emerald-600';
 };
 
+const intakeSections = [
+    {
+        title: 'Patient identification information',
+        fields: [
+            ['Full legal name', 'full_legal_name'],
+            ['Preferred name', 'preferred_name'],
+            ['Date of birth', 'date_of_birth'],
+            ['Gender/sex', 'gender_sex'],
+            ['National ID or patient ID number', 'national_id'],
+            ['Marital status', 'marital_status'],
+            ['Occupation', 'occupation'],
+            ['Education level', 'education_level'],
+            ['Address', 'address'],
+            ['Phone number', 'phone_number'],
+            ['Email address', 'email_address']
+        ]
+    },
+    {
+        title: 'Emergency contact',
+        fields: [
+            ['Name', 'emergency_contact_name'],
+            ['Relationship to patient', 'emergency_contact_relationship'],
+            ['Phone number', 'emergency_contact_phone'],
+            ['Alternative contact number', 'emergency_contact_alt_phone'],
+            ['Address', 'emergency_contact_address']
+        ]
+    },
+    {
+        title: 'Referral information',
+        fields: [
+            ['How the patient heard about the service', 'referral_source'],
+            ['Referring physician, therapist, or organization', 'referring_provider'],
+            ['Reason for referral', 'referral_reason']
+        ]
+    },
+    {
+        title: 'Presenting problem',
+        fields: [
+            ['Main concerns or symptoms', 'presenting_problem'],
+            ['Duration of symptoms', 'symptom_duration'],
+            ['Severity of symptoms', 'symptom_severity'],
+            ['What prompted seeking help now', 'seeking_help_reason'],
+            ['Patient goals for treatment', 'treatment_goals']
+        ]
+    },
+    {
+        title: 'Mental health history',
+        fields: [
+            ['Previous psychiatric diagnoses', 'previous_psychiatric_diagnoses'],
+            ['Previous counseling or psychotherapy', 'previous_counseling'],
+            ['Psychiatric hospitalizations', 'psychiatric_hospitalizations'],
+            ['History of self-harm', 'self_harm_history'],
+            ['Suicide attempts', 'suicide_attempts'],
+            ['History of violence or aggression', 'violence_history'],
+            ['Current mental health providers', 'current_mental_health_providers']
+        ]
+    },
+    {
+        title: 'Medical history',
+        fields: [
+            ['Current medical conditions', 'current_medical_conditions'],
+            ['Previous major illnesses or surgeries', 'previous_illnesses_or_surgeries'],
+            ['Neurological conditions', 'neurological_conditions'],
+            ['Current medications', 'current_medications'],
+            ['Allergies', 'allergies'],
+            ['Primary care physician details', 'primary_care_physician_details']
+        ]
+    },
+    {
+        title: 'Substance use history',
+        fields: [
+            ['Alcohol use', 'alcohol_use'],
+            ['Tobacco/nicotine use', 'tobacco_use'],
+            ['Recreational drug use', 'recreational_drug_use'],
+            ['Prescription medication misuse', 'prescription_misuse'],
+            ['History of addiction treatment', 'addiction_treatment_history']
+        ]
+    },
+    {
+        title: 'Family history',
+        fields: [
+            ['Family mental health conditions', 'family_mental_health_conditions'],
+            ['Substance abuse in family', 'family_substance_abuse'],
+            ['Suicide history in family', 'family_suicide_history'],
+            ['Significant medical conditions in family', 'family_medical_conditions']
+        ]
+    },
+    {
+        title: 'Social and personal history',
+        fields: [
+            ['Living situation', 'living_situation'],
+            ['Family structure', 'family_structure'],
+            ['Relationship status', 'relationship_status'],
+            ['Employment status', 'employment_status'],
+            ['Financial stressors', 'financial_stressors'],
+            ['Social support system', 'social_support_system'],
+            ['Religious/cultural considerations', 'religious_cultural_considerations']
+        ]
+    }
+];
+
+const formatIntakeValue = (value) => value ? value : 'Not provided';
+
 const authFetch = async (path, options = {}) => {
     const token = localStorage.getItem('serene_token');
     return fetch(`${API_BASE}${path}`, {
@@ -259,7 +362,7 @@ const DoctorDashboard = () => {
     };
 
     return (
-        <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative z-10">
+        <div className="flex-1 overflow-y-auto w-full p-4 lg:p-10 scroll-smooth relative">
             <div className="max-w-7xl mx-auto space-y-8">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -420,7 +523,7 @@ const DoctorDashboard = () => {
             </div>
 
             {selectedPatientId && (
-                <div className="fixed inset-0 bg-[#0D1B2A]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-[#0D1B2A]/40 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
                     <div className="bg-[#E8E8E8] border border-[#0E7C7B]/15 w-full max-w-6xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
                         <div className="px-6 py-4 border-b border-[#0E7C7B]/15 flex items-center justify-between bg-[#C2FFF0]/30">
                             <h2 className="text-xl font-bold text-[#0D1B2A] flex items-center gap-2">
@@ -493,6 +596,33 @@ const DoctorDashboard = () => {
                                                 <div className="text-[#3D5A80] italic text-sm">No screening has been completed yet.</div>
                                             )}
                                         </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-2xl border border-[#0E7C7B]/10 shadow-sm">
+                                        <h3 className="text-lg font-semibold text-[#0D1B2A] mb-4 border-b border-[#0E7C7B]/10 pb-2 flex items-center gap-2">
+                                            <ClipboardList className="text-[#0E7C7B]" size={18} /> Pre-assessment intake report
+                                        </h3>
+                                        {patientDetails.intake ? (
+                                            <div className="space-y-6">
+                                                {intakeSections.map((section) => (
+                                                    <div key={section.title}>
+                                                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#3D5A80] mb-3">{section.title}</h4>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {section.fields.map(([label, key]) => (
+                                                                <div key={key} className="rounded-xl bg-[#F8FBFB] border border-[#0E7C7B]/10 px-4 py-3">
+                                                                    <span className="block text-xs text-[#3D5A80] mb-1">{label}</span>
+                                                                    <span className="text-sm font-medium text-[#0D1B2A] whitespace-pre-wrap break-words">
+                                                                        {formatIntakeValue(patientDetails.intake[key])}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[#3D5A80] italic text-sm">This patient has not completed the intake form yet.</div>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

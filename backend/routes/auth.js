@@ -21,97 +21,458 @@ const runStatement = (sql, params = []) => new Promise((resolve, reject) => {
     });
 });
 
-// Register User
-router.post('/register', (req, res) => {
-    const { username, email, password } = req.body;
-
-    if (!username || !email || !password) {
-        return res.status(400).json({ error: 'Please provide all required fields' });
-    }
-
-    const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync(password, salt);
-
-    const sql = `INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)`;
-    db.run(sql, [username, email, passwordHash], function(err) {
-        if (err) {
-            if (err.message.includes('UNIQUE')) {
-                return res.status(400).json({ error: 'Username or email already exists' });
-            }
-            return res.status(500).json({ error: 'Database error: registration failed' });
-        }
-        
-        // Auto login on register, explicitly setting needsAssessment to true
-        const token = jwt.sign({ id: this.lastID, username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
-        res.status(201).json({
-            message: 'User created successfully',
-            token,
-            user: { id: this.lastID, username, email, role: 'patient', needsAssessment: true }
-        });
+const allRows = (sql, params = []) => new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows);
     });
 });
 
-// Login User
-router.post('/login', (req, res) => {
-    const { email, password } = req.body;
+const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+const LICENSE_PATTERN = /^[A-Za-z0-9/-][A-Za-z0-9/ -]*$/;
+const PERSON_NAME_PATTERN = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
+const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
+const GENERIC_TEXT_PATTERN = /^[A-Za-z0-9\s,.'()/-]{2,80}$/;
+const NATIONAL_ID_PATTERN = /^[A-Za-z0-9/-]{4,30}$/;
 
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Please provide email and password' });
+const normalizeEmail = (value = '') => value.trim().toLowerCase();
+const normalizeUsername = (value = '') => value.trim();
+const normalizeIdentifier = (value = '') => value.trim();
+
+const validateUsername = (value, label = 'Username') => {
+    if (!value) return `${label} is required`;
+    if (value.length < 3 || value.length > 24) return `${label} must be 3-24 characters long`;
+    if (!USERNAME_PATTERN.test(value)) {
+        return `${label} can only contain letters, numbers, dots, underscores, and hyphens`;
+    }
+    return '';
+};
+
+const validateEmail = (value) => {
+    if (!value) return 'Email is required';
+    if (value.length > 254) return 'Email is too long';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email address';
+    return '';
+};
+
+const validatePassword = (value) => {
+    if (!value) return 'Password is required';
+    if (value.length < 8 || value.length > 64) return 'Password must be 8-64 characters long';
+    if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) {
+        return 'Password must include uppercase, lowercase, and a number';
+    }
+    return '';
+};
+
+const validateFullName = (value) => {
+    if (!value) return 'Full name is required';
+    if (value.length < 2 || value.length > 80) return 'Full name must be 2-80 characters long';
+    return '';
+};
+
+const validateLicenseNumber = (value) => {
+    if (!value) return '';
+    if (value.length > 40) return 'License number is too long';
+    if (!LICENSE_PATTERN.test(value)) {
+        return 'License number can only contain letters, numbers, spaces, slashes, and hyphens';
+    }
+    return '';
+};
+
+const validateRegisterPayload = ({ username, email, password, confirmPassword, fullName, licenseNumber, isDoctor = false }) => {
+    if (isDoctor) {
+        const fullNameError = validateFullName(fullName);
+        if (fullNameError) return fullNameError;
     }
 
-    const sql = `SELECT * FROM Users WHERE email = ?`;
-    db.get(sql, [email], (err, user) => {
-        if (err) return res.status(500).json({ error: 'Database query error' });
-        
+    const usernameError = validateUsername(username);
+    if (usernameError) return usernameError;
+
+    const emailError = validateEmail(email);
+    if (emailError) return emailError;
+
+    const passwordError = validatePassword(password);
+    if (passwordError) return passwordError;
+
+    if (!confirmPassword) return 'Please confirm your password';
+    if (password !== confirmPassword) return 'Passwords do not match';
+
+    if (isDoctor) {
+        const licenseError = validateLicenseNumber(licenseNumber);
+        if (licenseError) return licenseError;
+    }
+
+    return '';
+};
+
+const validateLoginPayload = ({ identifier, password }) => {
+    if (!identifier) return 'Please provide username or email and password';
+    if (identifier.length < 3 || identifier.length > 254) {
+        return 'Username or email must be 3-254 characters long';
+    }
+    if (!password) return 'Please provide username or email and password';
+    if (password.length > 64) return 'Password is too long';
+    return '';
+};
+
+const normalizeText = (value = '') => String(value).trim();
+
+const validateIntakePayload = (payload, accountEmail = '') => {
+    const fullLegalName = normalizeText(payload.fullLegalName);
+    const preferredName = normalizeText(payload.preferredName);
+    const phoneNumber = normalizeText(payload.phoneNumber);
+    const emailAddress = normalizeEmail(payload.emailAddress);
+    const emergencyContactName = normalizeText(payload.emergencyContactName);
+    const emergencyContactRelationship = normalizeText(payload.emergencyContactRelationship);
+    const emergencyContactPhone = normalizeText(payload.emergencyContactPhone);
+    const emergencyContactAltPhone = normalizeText(payload.emergencyContactAltPhone);
+    const nationalId = normalizeText(payload.nationalId);
+    const presentingProblem = normalizeText(payload.presentingProblem);
+    const treatmentGoals = normalizeText(payload.treatmentGoals);
+
+    if (!PERSON_NAME_PATTERN.test(fullLegalName)) return 'Enter a valid full legal name';
+    if (preferredName && !PERSON_NAME_PATTERN.test(preferredName)) return 'Enter a valid preferred name';
+
+    if (!payload.dateOfBirth) return 'Date of birth is required';
+
+    const dob = new Date(payload.dateOfBirth);
+    const now = new Date();
+    const age = now.getFullYear() - dob.getFullYear() - (
+        now.getMonth() < dob.getMonth() ||
+        (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0
+    );
+
+    if (Number.isNaN(dob.getTime()) || payload.dateOfBirth > new Date().toISOString().split('T')[0] || age < 5 || age > 120) {
+        return 'Enter a valid date of birth';
+    }
+
+    if (!PHONE_PATTERN.test(phoneNumber)) return 'Enter a valid phone number';
+    if (!emailAddress || validateEmail(emailAddress)) return 'Enter a valid email address';
+    if (accountEmail && emailAddress !== normalizeEmail(accountEmail)) {
+        return 'The intake email must match the email on your account';
+    }
+
+    if (nationalId && !NATIONAL_ID_PATTERN.test(nationalId)) {
+        return 'National ID must be 4-30 letters, numbers, slashes, or hyphens';
+    }
+
+    if (!PERSON_NAME_PATTERN.test(emergencyContactName)) return 'Enter a valid emergency contact name';
+    if (emergencyContactRelationship && !GENERIC_TEXT_PATTERN.test(emergencyContactRelationship)) {
+        return 'Enter a valid emergency contact relationship';
+    }
+    if (!PHONE_PATTERN.test(emergencyContactPhone)) return 'Enter a valid emergency contact phone number';
+    if (emergencyContactAltPhone && !PHONE_PATTERN.test(emergencyContactAltPhone)) {
+        return 'Enter a valid alternative contact phone number';
+    }
+    if (presentingProblem.length < 10) return 'Main concerns or symptoms should be at least 10 characters';
+    if (treatmentGoals.length < 10) return 'Treatment goals should be at least 10 characters';
+
+    return '';
+};
+
+// Register User
+router.post('/register', async (req, res) => {
+    const username = normalizeUsername(req.body.username);
+    const email = normalizeEmail(req.body.email);
+    const password = req.body.password || '';
+    const confirmPassword = req.body.confirmPassword || '';
+    const validationError = validateRegisterPayload({ username, email, password, confirmPassword });
+
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    try {
+        const existingUser = await getRow(
+            `SELECT id FROM Users WHERE lower(username) = lower(?) OR lower(email) = lower(?)`,
+            [username, email]
+        );
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(password, salt);
+        const result = await runStatement(
+            `INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)`,
+            [username, email, passwordHash]
+        );
+
+        const token = jwt.sign({ id: result.lastID, username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
+        res.status(201).json({
+            message: 'User created successfully',
+            token,
+            user: { id: result.lastID, username, email, role: 'patient', needsIntake: true, needsAssessment: true }
+        });
+    } catch (err) {
+        if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
+        return res.status(500).json({ error: 'Database error: registration failed' });
+    }
+});
+
+// Login User
+router.post('/login', async (req, res) => {
+    const identifier = normalizeIdentifier(req.body.identifier || req.body.email || req.body.username);
+    const password = req.body.password || '';
+    const validationError = validateLoginPayload({ identifier, password });
+
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    try {
+        const user = await getRow(
+            `SELECT * FROM Users WHERE lower(email) = lower(?) OR lower(username) = lower(?)`,
+            [identifier, identifier]
+        );
+
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
         const isValidPassword = bcrypt.compareSync(password, user.password_hash);
         if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
         const token = jwt.sign({ id: user.id, username: user.username, role: 'patient' }, JWT_SECRET, { expiresIn: '7d' });
-        
-        // Check if user has completed the assessment
-        db.get(`SELECT id FROM Assessments WHERE user_id = ?`, [user.id], (err, assessment) => {
-            if (err) return res.status(500).json({ error: 'Database query error during assessment check' });
-            
-            res.json({
-                message: 'Login successful',
-                token,
-                user: { 
-                    id: user.id, 
-                    username: user.username, 
-                    email: user.email,
-                    role: 'patient',
-                    needsAssessment: !assessment // true if no assessment found
-                }
-            });
+        const intake = await getRow(`SELECT id FROM Patient_Intake WHERE user_id = ?`, [user.id]);
+        const assessment = await getRow(`SELECT id FROM Assessments WHERE user_id = ?`, [user.id]);
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: 'patient',
+                needsIntake: !intake,
+                needsAssessment: !assessment
+            }
         });
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Database query error' });
+    }
+});
+
+router.get('/intake', verifyToken, async (req, res) => {
+    try {
+        const intake = await getRow(`SELECT * FROM Patient_Intake WHERE user_id = ?`, [req.user.id]);
+        res.json({ intake: intake || null });
+    } catch (err) {
+        console.error('Intake fetch error:', err);
+        res.status(500).json({ error: 'Failed to fetch intake form.' });
+    }
+});
+
+router.post('/intake', verifyToken, async (req, res) => {
+    const userId = req.user.id;
+    const {
+        fullLegalName,
+        preferredName,
+        dateOfBirth,
+        genderSex,
+        nationalId,
+        maritalStatus,
+        occupation,
+        educationLevel,
+        address,
+        phoneNumber,
+        emailAddress,
+        emergencyContactName,
+        emergencyContactRelationship,
+        emergencyContactPhone,
+        emergencyContactAltPhone,
+        emergencyContactAddress,
+        referralSource,
+        referringProvider,
+        referralReason,
+        presentingProblem,
+        symptomDuration,
+        symptomSeverity,
+        seekingHelpReason,
+        treatmentGoals,
+        previousPsychiatricDiagnoses,
+        previousCounseling,
+        psychiatricHospitalizations,
+        selfHarmHistory,
+        suicideAttempts,
+        violenceHistory,
+        currentMentalHealthProviders,
+        currentMedicalConditions,
+        previousIllnessesOrSurgeries,
+        neurologicalConditions,
+        currentMedications,
+        allergies,
+        primaryCarePhysicianDetails,
+        alcoholUse,
+        tobaccoUse,
+        recreationalDrugUse,
+        prescriptionMisuse,
+        addictionTreatmentHistory,
+        familyMentalHealthConditions,
+        familySubstanceAbuse,
+        familySuicideHistory,
+        familyMedicalConditions,
+        livingSituation,
+        familyStructure,
+        relationshipStatus,
+        employmentStatus,
+        financialStressors,
+        socialSupportSystem,
+        religiousCulturalConsiderations
+    } = req.body;
+
+    try {
+        const user = await getRow(`SELECT email FROM Users WHERE id = ?`, [userId]);
+        if (!user) {
+            return res.status(404).json({ error: 'User account not found.' });
+        }
+
+        const validationError = validateIntakePayload(req.body, user.email);
+        if (validationError) {
+            return res.status(400).json({ error: validationError });
+        }
+
+        const fields = {
+            full_legal_name: normalizeText(fullLegalName),
+            preferred_name: normalizeText(preferredName),
+            date_of_birth: dateOfBirth,
+            gender_sex: normalizeText(genderSex),
+            national_id: normalizeText(nationalId),
+            marital_status: normalizeText(maritalStatus),
+            occupation: normalizeText(occupation),
+            education_level: normalizeText(educationLevel),
+            address: normalizeText(address),
+            phone_number: normalizeText(phoneNumber),
+            email_address: normalizeEmail(emailAddress),
+            emergency_contact_name: normalizeText(emergencyContactName),
+            emergency_contact_relationship: normalizeText(emergencyContactRelationship),
+            emergency_contact_phone: normalizeText(emergencyContactPhone),
+            emergency_contact_alt_phone: normalizeText(emergencyContactAltPhone),
+            emergency_contact_address: normalizeText(emergencyContactAddress),
+            referral_source: normalizeText(referralSource),
+            referring_provider: normalizeText(referringProvider),
+            referral_reason: normalizeText(referralReason),
+            presenting_problem: normalizeText(presentingProblem),
+            symptom_duration: normalizeText(symptomDuration),
+            symptom_severity: normalizeText(symptomSeverity),
+            seeking_help_reason: normalizeText(seekingHelpReason),
+            treatment_goals: normalizeText(treatmentGoals),
+            previous_psychiatric_diagnoses: normalizeText(previousPsychiatricDiagnoses),
+            previous_counseling: normalizeText(previousCounseling),
+            psychiatric_hospitalizations: normalizeText(psychiatricHospitalizations),
+            self_harm_history: normalizeText(selfHarmHistory),
+            suicide_attempts: normalizeText(suicideAttempts),
+            violence_history: normalizeText(violenceHistory),
+            current_mental_health_providers: normalizeText(currentMentalHealthProviders),
+            current_medical_conditions: normalizeText(currentMedicalConditions),
+            previous_illnesses_or_surgeries: normalizeText(previousIllnessesOrSurgeries),
+            neurological_conditions: normalizeText(neurologicalConditions),
+            current_medications: normalizeText(currentMedications),
+            allergies: normalizeText(allergies),
+            primary_care_physician_details: normalizeText(primaryCarePhysicianDetails),
+            alcohol_use: normalizeText(alcoholUse),
+            tobacco_use: normalizeText(tobaccoUse),
+            recreational_drug_use: normalizeText(recreationalDrugUse),
+            prescription_misuse: normalizeText(prescriptionMisuse),
+            addiction_treatment_history: normalizeText(addictionTreatmentHistory),
+            family_mental_health_conditions: normalizeText(familyMentalHealthConditions),
+            family_substance_abuse: normalizeText(familySubstanceAbuse),
+            family_suicide_history: normalizeText(familySuicideHistory),
+            family_medical_conditions: normalizeText(familyMedicalConditions),
+            living_situation: normalizeText(livingSituation),
+            family_structure: normalizeText(familyStructure),
+            relationship_status: normalizeText(relationshipStatus),
+            employment_status: normalizeText(employmentStatus),
+            financial_stressors: normalizeText(financialStressors),
+            social_support_system: normalizeText(socialSupportSystem),
+            religious_cultural_considerations: normalizeText(religiousCulturalConsiderations)
+        };
+
+        const columns = ['user_id', ...Object.keys(fields)];
+        const insertValues = [userId, ...Object.values(fields)];
+        const placeholders = columns.map(() => '?').join(', ');
+        const updateAssignments = Object.keys(fields)
+            .map((column) => `${column} = excluded.${column}`)
+            .join(', ');
+
+        await runStatement(
+            `
+                INSERT INTO Patient_Intake (${columns.join(', ')})
+                VALUES (${placeholders})
+                ON CONFLICT(user_id) DO UPDATE SET
+                    ${updateAssignments},
+                    updated_at = CURRENT_TIMESTAMP
+            `,
+            insertValues
+        );
+
+        res.status(201).json({ message: 'Intake form saved successfully.' });
+    } catch (err) {
+        console.error('Intake save error:', err);
+        res.status(500).json({ error: 'Failed to save intake form.' });
+    }
 });
 
 // Register Doctor
 router.post('/doctor/register', async (req, res) => {
-    const { fullName, email, password, specialization, licenseNumber } = req.body;
+    const fullName = (req.body.fullName || '').trim();
+    const username = normalizeUsername(req.body.username);
+    const email = normalizeEmail(req.body.email);
+    const password = req.body.password || '';
+    const confirmPassword = req.body.confirmPassword || '';
+    const specialization = (req.body.specialization || '').trim();
+    const licenseNumber = (req.body.licenseNumber || '').trim();
+    const validationError = validateRegisterPayload({
+        username,
+        email,
+        password,
+        confirmPassword,
+        fullName,
+        licenseNumber,
+        isDoctor: true
+    });
 
-    if (!fullName || !email || !password) {
-        return res.status(400).json({ error: 'Please provide full name, email, and password' });
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
     }
 
     try {
+        const doctorColumns = await allRows(`PRAGMA table_info(Doctors)`);
+        const hasUsernameColumn = doctorColumns.some(column => column.name === 'username');
+
+        if (!hasUsernameColumn) {
+            return res.status(500).json({ error: 'Doctor username support is unavailable. Please restart the server and try again.' });
+        }
+
+        const existingDoctor = await getRow(
+            `SELECT id FROM Doctors WHERE lower(username) = lower(?) OR lower(email) = lower(?)`,
+            [username, email]
+        );
+
+        if (existingDoctor) {
+            return res.status(400).json({ error: 'Doctor username or email already exists' });
+        }
+
         const salt = bcrypt.genSaltSync(10);
         const passwordHash = bcrypt.hashSync(password, salt);
 
+        const fields = ['username', 'full_name', 'email', 'password_hash', 'specialization', 'license_number'];
+        const values = [username, fullName, email, passwordHash, specialization || '', licenseNumber || ''];
+
+        const placeholders = fields.map(() => '?').join(', ');
         const result = await runStatement(
-            `INSERT INTO Doctors (full_name, email, password_hash, specialization, license_number) VALUES (?, ?, ?, ?, ?)`,
-            [fullName, email, passwordHash, specialization || '', licenseNumber || '']
+            `INSERT INTO Doctors (${fields.join(', ')}) VALUES (${placeholders})`,
+            values
         );
 
         const token = jwt.sign(
-            { id: result.lastID, fullName, email, role: 'doctor' },
+            { id: result.lastID, username, fullName, email, role: 'doctor' },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -121,6 +482,7 @@ router.post('/doctor/register', async (req, res) => {
             token,
             user: {
                 id: result.lastID,
+                username,
                 fullName,
                 email,
                 specialization: specialization || '',
@@ -131,7 +493,7 @@ router.post('/doctor/register', async (req, res) => {
         });
     } catch (err) {
         if (err.message && err.message.includes('UNIQUE')) {
-            return res.status(400).json({ error: 'A doctor account with this email already exists' });
+            return res.status(400).json({ error: 'Doctor username or email already exists' });
         }
 
         console.error('Doctor registration error:', err);
@@ -141,25 +503,35 @@ router.post('/doctor/register', async (req, res) => {
 
 // Login Doctor
 router.post('/doctor/login', async (req, res) => {
-    const { email, password } = req.body;
+    const identifier = normalizeIdentifier(req.body.identifier || req.body.email || req.body.username);
+    const password = req.body.password || '';
+    const validationError = validateLoginPayload({ identifier, password });
 
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Please provide email and password' });
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
     }
 
     try {
-        const doctor = await getRow(`SELECT * FROM Doctors WHERE email = ?`, [email]);
+        const doctorColumns = await allRows(`PRAGMA table_info(Doctors)`);
+        const hasUsernameColumn = doctorColumns.some(column => column.name === 'username');
+        const doctor = hasUsernameColumn
+            ? await getRow(
+                `SELECT * FROM Doctors WHERE lower(email) = lower(?) OR lower(username) = lower(?)`,
+                [identifier, identifier]
+            )
+            : await getRow(`SELECT * FROM Doctors WHERE lower(email) = lower(?)`, [identifier]);
+
         if (!doctor) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
         const isValidPassword = bcrypt.compareSync(password, doctor.password_hash);
         if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
         const token = jwt.sign(
-            { id: doctor.id, fullName: doctor.full_name, email: doctor.email, role: 'doctor' },
+            { id: doctor.id, username: doctor.username || '', fullName: doctor.full_name, email: doctor.email, role: 'doctor' },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -169,6 +541,7 @@ router.post('/doctor/login', async (req, res) => {
             token,
             user: {
                 id: doctor.id,
+                username: doctor.username || '',
                 fullName: doctor.full_name,
                 email: doctor.email,
                 specialization: doctor.specialization || '',

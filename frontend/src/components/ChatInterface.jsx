@@ -8,6 +8,14 @@ import BookingModal from './BookingModal';
 
 const API_BASE = 'http://localhost:5000';
 
+const createWelcomeMessage = () => ({
+    id: Date.now(),
+    text: "Hello there. I'm SereneMind. How are you feeling today?",
+    sender: 'ai',
+    timestamp: new Date(),
+    isPlaceholder: true
+});
+
 const ChatInterface = () => {
     const { t, i18n } = useTranslation();
     const [messages, setMessages] = useState([]);
@@ -153,9 +161,10 @@ const ChatInterface = () => {
                             text: msg.content,
                             sender: msg.sender,
                             timestamp: msg.timestamp,
-                            isCrisisNote: msg.risk_level === 'HIGH'
+                            isCrisisNote: msg.risk_level === 'HIGH',
+                            isPlaceholder: false
                         }));
-                        setMessages(formatted.length > 0 ? formatted : [{ id: Date.now(), text: "Hello there. I'm SereneMind. How are you feeling today?", sender: 'ai', timestamp: new Date() }]);
+                        setMessages(formatted.length > 0 ? formatted : [createWelcomeMessage()]);
                         setActiveSessionId(sessionId);
                         
                         // Fetch sessions list to find the title for the header
@@ -188,11 +197,12 @@ const ChatInterface = () => {
                                 text: msg.content,
                                 sender: msg.sender,
                                 timestamp: msg.timestamp,
-                                isCrisisNote: msg.risk_level === 'HIGH'
+                                isCrisisNote: msg.risk_level === 'HIGH',
+                                isPlaceholder: false
                             }));
                             setMessages(formatted);
                         } else {
-                            setMessages([{ id: Date.now(), text: "Hello there. I'm SereneMind. How are you feeling today?", sender: 'ai', timestamp: new Date() }]);
+                            setMessages([createWelcomeMessage()]);
                         }
                         setActiveSessionId(data.sessionId);
                         setActiveSessionTitle(data.sessionTitle);
@@ -226,13 +236,18 @@ const ChatInterface = () => {
 
         try {
             const token = localStorage.getItem('serene_token');
+<<<<<<< HEAD
             const response = await fetch(`${API_BASE}/api/chat`, {
+=======
+            const historyForApi = messages.filter(msg => !msg.isPlaceholder);
+            const response = await fetch('http://localhost:5000/api/chat', {
+>>>>>>> 0302409d702771061a53434487dc56762d7a7dc5
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ message: input, history: messages, sessionId: activeSessionId })
+                body: JSON.stringify({ message: input, history: historyForApi, sessionId: activeSessionId })
             });
             const data = await response.json();
             

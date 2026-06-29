@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Assessment from './components/Assessment';
+import PatientIntake from './components/PatientIntake';
 import LandingPage from './components/landing/LandingPage';
 import DoctorDashboard from './components/DoctorDashboard';
 import DoctorLogin from './components/DoctorLogin';
@@ -24,6 +25,10 @@ const ProtectedRoute = ({ children }) => {
 
   if (user.role === 'doctor') {
     return <Navigate to="/doctor" replace />;
+  }
+
+  if (user.needsIntake) {
+    return <Navigate to="/intake" replace />;
   }
   
   // Intercept and force assessment
@@ -45,8 +50,27 @@ const AssessmentRoute = ({ children }) => {
   if (user.role === 'doctor') {
       return <Navigate to="/doctor" replace />;
   }
+  if (user.needsIntake) {
+      return <Navigate to="/intake" replace />;
+  }
   if (!user.needsAssessment) {
       return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
+
+const IntakeRoute = ({ children }) => {
+  const token = localStorage.getItem('serene_token');
+  const userStr = localStorage.getItem('serene_user');
+
+  if (!token || !userStr) return <Navigate to="/login" replace />;
+
+  const user = JSON.parse(userStr);
+  if (user.role === 'doctor') {
+      return <Navigate to="/doctor" replace />;
+  }
+  if (!user.needsIntake) {
+      return <Navigate to={user.needsAssessment ? '/assessment' : '/dashboard'} replace />;
   }
   return children;
 };
@@ -83,6 +107,10 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/doctor-login" element={<DoctorLogin />} />
+
+        <Route path="/intake" element={
+          <IntakeRoute><PatientIntake /></IntakeRoute>
+        } />
         
         {/* Assessment Route */}
         <Route path="/assessment" element={
