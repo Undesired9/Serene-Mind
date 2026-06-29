@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, HeartPulse, Infinity, AlertTriangle, Mic, Volume2, VolumeX, Lock } from 'lucide-react';
+import { Send, HeartPulse, Infinity, AlertTriangle, Mic, Volume2, VolumeX, Lock, LifeBuoy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import SereneBlob from './SereneBlob';
 import BookingModal from './BookingModal';
+import GroundingModal from './GroundingModal';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -26,6 +27,7 @@ const ChatInterface = () => {
     const [voiceEnabled, setVoiceEnabled] = useState(true);
     const [escalationStatus, setEscalationStatus] = useState(null);
     const [showBookingModal, setShowBookingModal] = useState(false);
+    const [showGroundingModal, setShowGroundingModal] = useState(false);
     
     const [searchParams, setSearchParams] = useSearchParams();
     const sessionIdParam = searchParams.get('session');
@@ -310,18 +312,28 @@ const ChatInterface = () => {
                         )}
                     </div>
                 </div>
-                {/* Voice Controls */}
-                <button 
-                    onClick={() => {
-                        setVoiceEnabled(!voiceEnabled);
-                        if(voiceEnabled) window.speechSynthesis?.cancel(); // Mute immediately
-                    }}
-                    className={`p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm ${voiceEnabled ? 'bg-[#1B98E0]/10 text-[#1B98E0] hover:bg-[#1B98E0]/20 border border-[#1B98E0]/20' : 'bg-[#E8E8E8] text-[#3D5A80] hover:bg-[#C2FFF0]/30 border border-[#0E7C7B]/15'}`}
-                    title={voiceEnabled ? "Mute AI Therapist" : "Unmute AI Therapist"}
-                >
-                    {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                    <span className="text-xs font-bold hidden sm:inline">{voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
-                </button>
+                {/* SOS/Grounding Button */}
+            <button 
+                onClick={() => setShowGroundingModal(true)}
+                className="p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                title="Start Grounding Exercise"
+            >
+                <LifeBuoy size={18} />
+                <span className="text-xs font-bold hidden sm:inline">SOS</span>
+            </button>
+
+            {/* Voice Controls */}
+            <button 
+                onClick={() => {
+                    setVoiceEnabled(!voiceEnabled);
+                    if(voiceEnabled) window.speechSynthesis?.cancel(); // Mute immediately
+                }}
+                className={`p-2 rounded-xl transition-all flex items-center gap-2 shadow-sm ${voiceEnabled ? 'bg-[#1B98E0]/10 text-[#1B98E0] hover:bg-[#1B98E0]/20 border border-[#1B98E0]/20' : 'bg-[#E8E8E8] text-[#3D5A80] hover:bg-[#C2FFF0]/30 border border-[#0E7C7B]/15'}`}
+                title={voiceEnabled ? "Mute AI Therapist" : "Unmute AI Therapist"}
+            >
+                {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                <span className="text-xs font-bold hidden sm:inline">{voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+            </button>
             </header>
 
             {/* Chat Locked Banner */}
@@ -463,6 +475,12 @@ const ChatInterface = () => {
                     }
                 }}
                 onBooked={handleBookingSuccess}
+            />
+            
+            {/* Grounding Modal */}
+            <GroundingModal 
+                isOpen={showGroundingModal} 
+                onClose={() => setShowGroundingModal(false)}
             />
         </div>
     );

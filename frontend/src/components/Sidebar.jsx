@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, MessageSquare, Activity, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Users, FileText } from 'lucide-react';
+import { Home, MessageSquare, Activity, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Users, FileText, Calendar } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -104,6 +104,7 @@ const Sidebar = () => {
                     <>
                         <NavItem icon={<Home size={20} />} label={t('nav_dashboard')} active={location.pathname === '/dashboard'} onClick={() => navigate('/dashboard')} isCollapsed={isCollapsed} />
                         <NavItem icon={<MessageSquare size={20} />} label={t('nav_chat')} active={location.pathname === '/chat'} onClick={() => navigate('/chat')} isCollapsed={isCollapsed} />
+                        <NavItem icon={<Calendar size={20} />} label="Appointments" active={location.pathname === '/appointments'} onClick={() => navigate('/appointments')} isCollapsed={isCollapsed} />
                         <NavItem icon={<Activity size={20} />} label={t('nav_reports')} active={location.pathname === '/reports'} onClick={() => navigate('/reports')} isCollapsed={isCollapsed} />
                         <NavItem icon={<Settings size={20} />} label={t('nav_settings')} active={location.pathname === '/settings'} onClick={() => navigate('/settings')} isCollapsed={isCollapsed} />
                     </>

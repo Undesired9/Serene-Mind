@@ -11,6 +11,7 @@ import PatientIntake from './components/PatientIntake';
 import LandingPage from './components/landing/LandingPage';
 import DoctorDashboard from './components/DoctorDashboard';
 import DoctorLogin from './components/DoctorLogin';
+import PatientAppointments from './components/PatientAppointments';
 
 // A protective wrapper that also enforces the Assessment requirement
 const ProtectedRoute = ({ children }) => {
@@ -127,6 +128,12 @@ function App() {
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <MainLayout><Dashboard /></MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/appointments" element={
+          <ProtectedRoute>
+            <MainLayout><PatientAppointments /></MainLayout>
           </ProtectedRoute>
         } />
 

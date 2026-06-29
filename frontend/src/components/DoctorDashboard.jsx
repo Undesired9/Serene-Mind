@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, ClipboardList, Clock, FileText, Heart, MessageSquare, Search, ShieldCheck, Users, X } from 'lucide-react';
+import DoctorAvailability from './DoctorAvailability';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -151,6 +152,7 @@ const DoctorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('patients');
     const [selectedPatientId, setSelectedPatientId] = useState(null);
     const [patientDetails, setPatientDetails] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
@@ -380,146 +382,186 @@ const DoctorDashboard = () => {
                     <StatCard icon={<Heart className="text-[#1B98E0]" />} label="Average logged mood" value={dashboardStats.avgMood === '--' ? '--' : `${dashboardStats.avgMood}/10`} tone="bg-sky-50 border-sky-100 text-[#1B98E0]" />
                 </div>
 
-                {/* Appointments Section */}
-                <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
-                    <h2 className="text-lg font-semibold text-[#0D1B2A] mb-4 flex items-center gap-2">
-                        <Calendar className="text-[#0E7C7B]" size={20} />
-                        Upcoming Appointments
-                    </h2>
-                    {appointments.length === 0 ? (
-                        <p className="text-[#3D5A80] text-sm">No upcoming appointments</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {appointments.map((appointment) => (
-                                <div key={appointment.id} className="bg-white p-4 rounded-2xl border border-[#0E7C7B]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-semibold text-[#0D1B2A]">{appointment.patient_name}</h3>
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                                appointment.risk_tier === 'CRITICAL' || appointment.risk_tier === 'HIGH' 
-                                                ? 'bg-rose-100 text-rose-700' 
-                                                : appointment.risk_tier === 'ELEVATED' 
-                                                ? 'bg-amber-100 text-amber-700' 
-                                                : 'bg-emerald-100 text-emerald-700'
-                                            }`}>
-                                                {appointment.risk_tier} Risk
-                                            </span>
+                {/* Tabs */}
+                <div className="flex gap-4 border-b border-[#0E7C7B]/20 pb-2">
+                    <button 
+                        onClick={() => setActiveTab('patients')}
+                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'patients' 
+                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
+                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                    >
+                        Patients
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('appointments')}
+                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'appointments' 
+                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
+                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                    >
+                        Appointments
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('availability')}
+                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'availability' 
+                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
+                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                    >
+                        Availability
+                    </button>
+                </div>
+
+                {activeTab === 'appointments' && (
+                    <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
+                        <h2 className="text-lg font-semibold text-[#0D1B2A] mb-4 flex items-center gap-2">
+                            <Calendar className="text-[#0E7C7B]" size={20} />
+                            Upcoming Appointments
+                        </h2>
+                        {appointments.length === 0 ? (
+                            <p className="text-[#3D5A80] text-sm">No upcoming appointments</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {appointments.map((appointment) => (
+                                    <div key={appointment.id} className="bg-white p-4 rounded-2xl border border-[#0E7C7B]/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h3 className="font-semibold text-[#0D1B2A]">{appointment.patient_name}</h3>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                    appointment.risk_tier === 'CRITICAL' || appointment.risk_tier === 'HIGH' 
+                                                    ? 'bg-rose-100 text-rose-700' 
+                                                    : appointment.risk_tier === 'ELEVATED' 
+                                                    ? 'bg-amber-100 text-amber-700' 
+                                                    : 'bg-emerald-100 text-emerald-700'
+                                                }`}>
+                                                    {appointment.risk_tier} Risk
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-[#3D5A80] flex items-center gap-1">
+                                                <Clock size={14} />
+                                                {formatDateTime(appointment.appointment_datetime)}
+                                            </p>
+                                            {appointment.notes && (
+                                                <p className="text-xs text-[#3D5A80] mt-1">{appointment.notes}</p>
+                                            )}
                                         </div>
-                                        <p className="text-sm text-[#3D5A80] flex items-center gap-1">
-                                            <Clock size={14} />
-                                            {formatDateTime(appointment.appointment_datetime)}
-                                        </p>
-                                        {appointment.notes && (
-                                            <p className="text-xs text-[#3D5A80] mt-1">{appointment.notes}</p>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-[#3D5A80] uppercase">{appointment.status}</span>
+                                            {appointment.status === 'SCHEDULED' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleUpdateAppointmentStatus(appointment.id, 'COMPLETED')}
+                                                        className="text-xs bg-emerald-500 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition"
+                                                    >
+                                                        Complete
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleUpdateAppointmentStatus(appointment.id, 'CANCELLED')}
+                                                        className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-300 transition"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-semibold text-[#3D5A80] uppercase">{appointment.status}</span>
-                                        {appointment.status === 'SCHEDULED' && (
-                                            <>
-                                                <button
-                                                    onClick={() => handleUpdateAppointmentStatus(appointment.id, 'COMPLETED')}
-                                                    className="text-xs bg-emerald-500 text-white px-3 py-1 rounded-lg hover:bg-emerald-600 transition"
-                                                >
-                                                    Complete
-                                                </button>
-                                                <button
-                                                    onClick={() => handleUpdateAppointmentStatus(appointment.id, 'CANCELLED')}
-                                                    className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-300 transition"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
-                    <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-                        <div>
-                            <h2 className="text-lg font-semibold text-[#0D1B2A]">Patient roster</h2>
-                            <p className="text-sm text-[#3D5A80]">{filteredPatients.length} of {patients.length} patients shown, {dashboardStats.assessed} with completed screening.</p>
-                        </div>
-                        <label className="flex items-center gap-3 bg-[#E8E8E8]/80 border border-[#0E7C7B]/10 rounded-2xl px-4 py-3 min-w-0 md:min-w-[320px]">
-                            <Search size={18} className="text-[#3D5A80]" />
-                            <input
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
-                                placeholder="Search by name, email, or concern"
-                                className="bg-transparent w-full outline-none text-sm text-[#0D1B2A] placeholder:text-[#3D5A80]"
-                            />
-                        </label>
-                    </div>
-                </div>
-
-                {loading ? (
-                    <div className="h-[300px] w-full flex items-center justify-center">
-                        <div className="w-8 h-8 border-t-2 border-[#1B98E0] animate-spin rounded-full"></div>
-                    </div>
-                ) : error ? (
-                    <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 text-rose-700">{error}</div>
-                ) : filteredPatients.length === 0 ? (
-                    <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-10 text-center text-[#3D5A80]">
-                        No patients match the current search.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filteredPatients.map((patient) => (
-                            <button
-                                key={patient.id}
-                                type="button"
-                                onClick={() => handlePatientClick(patient.id)}
-                                className="text-left bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 hover:border-[#0E7C7B]/30 transition-all duration-300 rounded-3xl p-6 group hover:shadow-lg relative overflow-hidden"
-                            >
-                                {patient.crisis_risk && (
-                                    <div className="absolute top-0 right-0 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm flex items-center gap-1 z-10">
-                                        <AlertTriangle size={12} /> High risk
-                                    </div>
-                                )}
-
-                                <div className="flex items-start gap-4 mb-5">
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border text-lg font-bold ${patient.crisis_risk ? 'bg-rose-100 text-rose-600 border-rose-300' : 'bg-[#C2FFF0]/50 text-[#0E7C7B] border-[#0E7C7B]/20'}`}>
-                                        {patient.username.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h3 className="text-[#0D1B2A] font-bold text-lg truncate">{patient.username}</h3>
-                                        <p className="text-xs text-[#3D5A80] font-medium truncate">{patient.email}</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-[#3D5A80]">Screening severity</span>
-                                        <span className={`font-semibold ${severityClass(patient.severity)}`}>{patient.severity || 'Not available'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-[#3D5A80]">Overall score</span>
-                                        <span className="font-semibold text-[#0D1B2A]">{patient.total_score != null ? `${patient.total_score} / 63` : 'Not available'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-[#3D5A80]">Main concern</span>
-                                        <span className="font-semibold text-[#0D1B2A] text-right">{patient.main_concern || 'Unspecified'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-[#3D5A80]">Avg mood score</span>
-                                        <span className="font-semibold text-[#0D1B2A]">{patient.avg_mood != null ? `${patient.avg_mood}/10` : 'No logs'}</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 pt-4 border-t border-[#0E7C7B]/10 flex justify-between items-center text-xs font-medium text-[#3D5A80]">
-                                    <span className="flex items-center gap-1">
-                                        <Clock size={12} /> Joined {formatDate(patient.created_at)}
-                                    </span>
-                                    <span>{patient.total_sessions || 0} chat entries</span>
-                                </div>
-                            </button>
-                        ))}
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
+
+                {activeTab === 'patients' && (
+                    <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
+                        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-[#0D1B2A]">Patient roster</h2>
+                                <p className="text-sm text-[#3D5A80]">{filteredPatients.length} of {patients.length} patients shown, {dashboardStats.assessed} with completed screening.</p>
+                            </div>
+                            <label className="flex items-center gap-3 bg-[#E8E8E8]/80 border border-[#0E7C7B]/10 rounded-2xl px-4 py-3 min-w-0 md:min-w-[320px]">
+                                <Search size={18} className="text-[#3D5A80]" />
+                                <input
+                                    value={searchTerm}
+                                    onChange={(event) => setSearchTerm(event.target.value)}
+                                    placeholder="Search by name, email, or concern"
+                                    className="bg-transparent w-full outline-none text-sm text-[#0D1B2A] placeholder:text-[#3D5A80]"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+
+                {activeTab === 'patients' && (
+                    <>
+                        {loading ? (
+                            <div className="h-[300px] w-full flex items-center justify-center">
+                                <div className="w-8 h-8 border-t-2 border-[#1B98E0] animate-spin rounded-full"></div>
+                            </div>
+                        ) : error ? (
+                            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 text-rose-700">{error}</div>
+                        ) : filteredPatients.length === 0 ? (
+                            <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-10 text-center text-[#3D5A80]">
+                                No patients match the current search.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {filteredPatients.map((patient) => (
+                                    <button
+                                        key={patient.id}
+                                        type="button"
+                                        onClick={() => handlePatientClick(patient.id)}
+                                        className="text-left bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 hover:border-[#0E7C7B]/30 transition-all duration-300 rounded-3xl p-6 group hover:shadow-lg relative overflow-hidden"
+                                    >
+                                        {patient.crisis_risk && (
+                                            <div className="absolute top-0 right-0 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm flex items-center gap-1 z-10">
+                                                <AlertTriangle size={12} /> High risk
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-start gap-4 mb-5">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border text-lg font-bold ${patient.crisis_risk ? 'bg-rose-100 text-rose-600 border-rose-300' : 'bg-[#C2FFF0]/50 text-[#0E7C7B] border-[#0E7C7B]/20'}`}>
+                                                {patient.username.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="text-[#0D1B2A] font-bold text-lg truncate">{patient.username}</h3>
+                                                <p className="text-xs text-[#3D5A80] font-medium truncate">{patient.email}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 text-sm">
+                                            <div className="flex justify-between gap-4">
+                                                <span className="text-[#3D5A80]">Screening severity</span>
+                                                <span className={`font-semibold ${severityClass(patient.severity)}`}>{patient.severity || 'Not available'}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-4">
+                                                <span className="text-[#3D5A80]">Overall score</span>
+                                                <span className="font-semibold text-[#0D1B2A]">{patient.total_score != null ? `${patient.total_score} / 63` : 'Not available'}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-4">
+                                                <span className="text-[#3D5A80]">Main concern</span>
+                                                <span className="font-semibold text-[#0D1B2A] text-right">{patient.main_concern || 'Unspecified'}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-4">
+                                                <span className="text-[#3D5A80]">Avg mood score</span>
+                                                <span className="font-semibold text-[#0D1B2A]">{patient.avg_mood != null ? `${patient.avg_mood}/10` : 'No logs'}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6 pt-4 border-t border-[#0E7C7B]/10 flex justify-between items-center text-xs font-medium text-[#3D5A80]">
+                                            <span className="flex items-center gap-1">
+                                                <Clock size={12} /> Joined {formatDate(patient.created_at)}
+                                            </span>
+                                            <span>{patient.total_sessions || 0} chat entries</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'availability' && <DoctorAvailability />}
+
+
             </div>
 
             {selectedPatientId && (
