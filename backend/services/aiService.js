@@ -95,7 +95,8 @@ const detectRisk = (message) => {
     return { score, tier };
 };
 
-const buildSystemPrompt = () => `You are SereneMind, a warm, professional, and empathetic therapist. Your approach is grounded in Person-Centered Therapy, Cognitive Behavioral Therapy (CBT), and mindfulness-based counseling.
+const buildSystemPrompt = (assessment) => {
+    let prompt = `You are SereneMind, a warm, professional, and empathetic therapist. Your approach is grounded in Person-Centered Therapy, Cognitive Behavioral Therapy (CBT), and mindfulness-based counseling.
 
 ROLE:
 - Provide a safe, non-judgmental space for emotional exploration and validation.
@@ -118,6 +119,26 @@ STRICT RULES:
 
 CRISIS PROTOCOL:
 - If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines.`;
+
+    if (assessment) {
+        prompt += `
+
+PATIENT ASSESSMENT INFORMATION:
+- Completed intake assessment: Yes
+- PHQ-9 (Depression) Score: ${assessment.phq9_score || 'Not provided'}
+- GAD-7 (Anxiety) Score: ${assessment.gad7_score || 'Not provided'}
+- Severity: ${assessment.severity || 'Not provided'}
+- Main Concern: ${assessment.main_concern || 'Not provided'}
+- Additional Notes: ${assessment.notes || 'Not provided'}
+
+INSTRUCTIONS:
+- Take the above assessment into account when responding to the user.
+- Tailor your support to their specific concerns and severity level.
+- Reference their assessment data naturally in your responses only when relevant, without being clinical about it.`;
+    }
+
+    return prompt;
+};
 
 const cleanOutput = (text) => {
     return text
@@ -197,7 +218,7 @@ const runWithModelResilience = async (runner) => {
     throw lastError;
 };
 
-const handleChat = async (message, history = [], onTextChunk = null) => {
+const handleChat = async (message, history = [], assessment = null, onTextChunk = null) => {
     const { score: riskScore, tier: riskTier } = detectRisk(message);
     const riskLevel = getRiskLevelFromTier(riskTier);
 
@@ -228,7 +249,7 @@ const handleChat = async (message, history = [], onTextChunk = null) => {
         const raw = await runWithModelResilience(async (modelName) => {
             const modelInstance = genAI.getGenerativeModel({
                 model: modelName,
-                systemInstruction: buildSystemPrompt()
+                systemInstruction: buildSystemPrompt(assessment)
             });
 
             const chat = modelInstance.startChat({

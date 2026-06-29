@@ -210,6 +210,20 @@ router.get('/sessions/:sessionId/history', verifyToken, (req, res) => {
     );
 });
 
+// Helper to get user's latest assessment
+async function getUserAssessment(userId) {
+    return new Promise((resolve, reject) => {
+        db.get(
+            `SELECT * FROM Assessments WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+            [userId],
+            (err, row) => {
+                if (err) return reject(err);
+                resolve(row);
+            }
+        );
+    });
+}
+
 // POST: Add new message to a session and get AI response
 router.post('/', verifyToken, async (req, res) => {
     let { message, history, sessionId } = req.body;
@@ -233,6 +247,9 @@ router.post('/', verifyToken, async (req, res) => {
             sessionId = await getOrCreateTodaySession(userId);
         }
 
+        // Get user's assessment
+        const assessment = await getUserAssessment(userId);
+
         // 1. Instantly save the user's message to the SQL DB
         await new Promise((resolve, reject) => {
             db.run(`INSERT INTO Sessions (user_id, sender, content, session_id) VALUES (?, 'user', ?, ?)`, 
@@ -243,8 +260,8 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 2. Process via AI service
-        const responseData = await handleChat(message, history);
+        // 2. Process via AI service with assessment data
+        const responseData = await handleChat(message, history, assessment);
         
         // 3. Save AI's response to SQL DB
         await new Promise((resolve, reject) => {
