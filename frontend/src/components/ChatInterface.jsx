@@ -236,12 +236,8 @@ const ChatInterface = () => {
 
         try {
             const token = localStorage.getItem('serene_token');
-<<<<<<< HEAD
-            const response = await fetch(`${API_BASE}/api/chat`, {
-=======
             const historyForApi = messages.filter(msg => !msg.isPlaceholder);
-            const response = await fetch('http://localhost:5000/api/chat', {
->>>>>>> 0302409d702771061a53434487dc56762d7a7dc5
+            const response = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
