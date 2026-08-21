@@ -46,46 +46,70 @@ router.get('/doctors', verifyToken, async (req, res) => {
     }
 });
 
-// GET: Get available slots for a doctor
-router.get('/doctors/:doctorId/availability', verifyToken, async (req, res) => {
-    const { doctorId } = req.params;
+// GET: Alias for mobile consistency
+router.get('/', verifyToken, async (req, res) => {
+    const userId = req.user.id;
     try {
-        // Get booked slots first
-        const bookedSlots = await new Promise((resolve, reject) => {
+        const appointments = await new Promise((resolve, reject) => {
             db.all(
-                `SELECT appointment_datetime FROM Appointments WHERE doctor_id = ? AND status = 'SCHEDULED'`,
-                [doctorId],
+                `SELECT a.*, d.full_name as doctor_name 
+                 FROM Appointments a 
+                 JOIN Doctors d ON a.doctor_id = d.id 
+                 WHERE a.patient_id = ? 
+                 ORDER BY a.appointment_datetime DESC`,
+                [userId],
                 (err, rows) => {
                     if (err) return reject(err);
-                    resolve(rows.map(r => new Date(r.appointment_datetime).getTime()));
+                    resolve(rows);
                 }
             );
         });
-
-        // Generate sample slots and filter out booked ones
-        const sampleSlots = generateSampleAvailability(doctorId);
-        const availableSlots = sampleSlots.filter(slot => {
-            const slotTime = new Date(slot.start_datetime).getTime();
-            return !bookedSlots.includes(slotTime);
-        });
-
-        res.json(availableSlots);
+        res.json(appointments);
     } catch (err) {
-        console.error('Failed to get availability:', err);
-        res.status(500).json({ error: 'Failed to get availability' });
+        console.error('Failed to get appointments:', err);
+        res.status(500).json({ error: 'Failed to get appointments' });
     }
 });
 
-// POST: Book an appointment
-router.post('/book', verifyToken, async (req, res) => {
+// POST: Book an appointment (with strict validation)
+const handleBooking = async (req, res) => {
     const userId = req.user.id;
-    const { doctorId, appointmentDatetime, notes } = req.body;
+    const doctorId = parseInt(req.body.doctorId || req.body.doctor_id, 10);
+    const rawDatetime = req.body.appointmentDatetime || req.body.appointment_date;
+    const rawNotes = req.body.notes || '';
 
-    if (!doctorId || !appointmentDatetime) {
-        return res.status(400).json({ error: 'Doctor ID and appointment datetime are required' });
+    // 1. Validate Doctor ID
+    if (!doctorId || isNaN(doctorId) || doctorId <= 0) {
+        return res.status(400).json({ error: 'Valid Doctor ID is required' });
     }
 
+    // 2. Validate Datetime
+    if (!rawDatetime) {
+        return res.status(400).json({ error: 'Appointment date and time are required' });
+    }
+
+    const apptDate = new Date(rawDatetime);
+    if (isNaN(apptDate.getTime())) {
+        return res.status(400).json({ error: 'Enter a valid appointment date and time format (YYYY-MM-DD HH:MM)' });
+    }
+
+    if (apptDate.getTime() < Date.now() - 60000) {
+        return res.status(400).json({ error: 'Appointment time must be in the future' });
+    }
+
+    // 3. Sanitize and trim notes
+    const notes = String(rawNotes).trim().slice(0, 500);
+
     try {
+        // Verify doctor exists
+        const doctor = await new Promise((resolve) => {
+            db.get(`SELECT id FROM Doctors WHERE id = ?`, [doctorId], (err, row) => resolve(row));
+        });
+
+        if (!doctor) {
+            return res.status(404).json({ error: 'Selected clinician does not exist' });
+        }
+
         // Get user's escalation status to get risk tier
         const escalationStatus = await new Promise((resolve, reject) => {
             db.get(`SELECT * FROM User_Escalation_Status WHERE user_id = ?`, [userId], (err, row) => {
@@ -94,11 +118,13 @@ router.post('/book', verifyToken, async (req, res) => {
             });
         });
 
+        const formattedDatetime = apptDate.toISOString();
+
         // Create appointment
         const result = await new Promise((resolve, reject) => {
             db.run(
                 `INSERT INTO Appointments (patient_id, doctor_id, appointment_datetime, risk_tier, notes) VALUES (?, ?, ?, ?, ?)`,
-                [userId, doctorId, appointmentDatetime, escalationStatus?.current_risk_tier || 'ELEVATED', notes || ''],
+                [userId, doctorId, formattedDatetime, escalationStatus?.current_risk_tier || 'ELEVATED', notes],
                 function(err) {
                     if (err) return reject(err);
                     resolve(this);
@@ -131,7 +157,10 @@ router.post('/book', verifyToken, async (req, res) => {
         console.error('Failed to book appointment:', err);
         res.status(500).json({ error: 'Failed to book appointment' });
     }
-});
+};
+
+router.post('/book', verifyToken, handleBooking);
+router.post('/', verifyToken, handleBooking);
 
 // GET: Get user's appointments
 router.get('/my-appointments', verifyToken, async (req, res) => {

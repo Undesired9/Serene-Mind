@@ -284,6 +284,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 ip_address TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )`);
+
+            // Performance Indexes for Non-Functional Requirement: Low Latency & High Scalability
+            db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON Sessions(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON Sessions(session_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_mood_logs_user_date ON Mood_Logs(user_id, date)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_assessments_user_id ON Assessments(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_patient_intake_user_id ON Patient_Intake(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_risk_evals_user_id ON Risk_Evaluations(user_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_appointments_patient ON Appointments(patient_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_appointments_doctor ON Appointments(doctor_id)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON Audit_Logs(user_id)`);
         });
     }
 });

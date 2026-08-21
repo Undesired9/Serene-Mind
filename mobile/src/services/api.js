@@ -45,21 +45,21 @@ export const api = {
     // Auth
     login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
     register: (userData) => request('/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
-    doctorLogin: (credentials) => request('/doctor/login', { method: 'POST', body: JSON.stringify(credentials) }),
+    doctorLogin: (credentials) => request('/auth/doctor-login', { method: 'POST', body: JSON.stringify(credentials) }),
     
     // Intake & Assessment
     submitIntake: (data) => request('/auth/intake', { method: 'POST', body: JSON.stringify(data) }),
     submitAssessment: (data) => request('/auth/assessment', { method: 'POST', body: JSON.stringify(data) }),
 
     // Dashboard & Check-ins
-    getDashboard: () => request('/dashboard'),
-    postCheckin: (checkinData) => request('/dashboard/checkin', { method: 'POST', body: JSON.stringify(checkinData) }),
+    getDashboard: () => request('/dashboard/stats'),
+    postCheckin: (checkinData) => request('/dashboard/mood', { method: 'POST', body: JSON.stringify(checkinData) }),
 
     // Chat
     getSessions: () => request('/chat/sessions'),
     createSession: () => request('/chat/sessions', { method: 'POST' }),
-    getMessages: (sessionId) => request(`/chat/messages/${sessionId}`),
-    sendMessage: (sessionId, message, locale = 'en') => request('/chat/message', {
+    getMessages: (sessionId) => request(`/chat/sessions/${sessionId}/history`),
+    sendMessage: (sessionId, message, locale = 'en') => request('/chat', {
         method: 'POST',
         body: JSON.stringify({ sessionId, message, locale })
     }),
@@ -73,13 +73,13 @@ export const api = {
     }),
 
     // Reports
-    getReports: () => request('/reports'),
+    getReports: () => request('/dashboard/reports'),
 
     // Doctor Portal
     getDoctorPatients: () => request('/doctor/patients'),
-    getDoctorAppointments: () => request('/doctor/appointments'),
-    updateDoctorAppointment: (id, status) => request(`/doctor/appointments/${id}/status`, {
-        method: 'PATCH',
+    getDoctorAppointments: () => request('/appointments/doctor-appointments'),
+    updateDoctorAppointment: (id, status) => request(`/appointments/${id}/status`, {
+        method: 'PUT',
         body: JSON.stringify({ status })
     })
 };

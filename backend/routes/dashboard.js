@@ -25,28 +25,33 @@ const allQuery = (sql, params) => new Promise((resolve, reject) => {
     });
 });
 
-// POST /mood: Log today's mood
-router.post('/mood', verifyToken, async (req, res) => {
+// POST /mood & /checkin: Log today's mood
+const handleMoodLog = async (req, res) => {
     const userId = req.user.id;
-    const { mood_score, notes } = req.body;
+    let { mood_score, notes } = req.body;
 
-    if (!mood_score || mood_score < 1 || mood_score > 10) {
+    mood_score = parseInt(mood_score, 10);
+
+    if (isNaN(mood_score) || mood_score < 1 || mood_score > 10) {
         return res.status(400).json({ error: 'Valid mood score (1-10) is required.' });
     }
 
+    const sanitizedNotes = String(notes || '').trim().slice(0, 500);
+
     try {
-        // Simple logic: insert mood log. If they log twice a day, we just let it happen or we can overwrite?
-        // Let's just insert it.
         await runQuery(
             `INSERT INTO Mood_Logs (user_id, mood_score, notes, date) VALUES (?, ?, ?, CURRENT_DATE)`,
-            [userId, mood_score, notes || '']
+            [userId, mood_score, sanitizedNotes]
         );
         res.json({ message: 'Mood logged successfully.' });
     } catch (err) {
         console.error('Mood logging error:', err);
         res.status(500).json({ error: 'Failed to log mood.' });
     }
-});
+};
+
+router.post('/mood', verifyToken, handleMoodLog);
+router.post('/checkin', verifyToken, handleMoodLog);
 
 // GET /stats: Return true dashboard analytics
 router.get('/stats', verifyToken, async (req, res) => {
