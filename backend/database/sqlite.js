@@ -213,6 +213,77 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (doctor_id) REFERENCES Doctors(id) ON DELETE CASCADE
             )`);
+
+            // Multi-Signal Risk Evaluations
+            db.run(`CREATE TABLE IF NOT EXISTS Risk_Evaluations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                risk_level TEXT NOT NULL, -- LOW, MODERATE, HIGH, CRITICAL
+                risk_score INTEGER NOT NULL DEFAULT 0,
+                triggered_signals TEXT, -- JSON array of signals
+                assessment_ref_id INTEGER,
+                conversation_ref_id INTEGER,
+                action_taken TEXT,
+                clinician_review_status TEXT DEFAULT 'PENDING', -- PENDING, REVIEWED, ESCALATED
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
+
+            // Structured Clinical Interventions
+            db.run(`CREATE TABLE IF NOT EXISTS Interventions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL, -- GROUNDING, BOX_BREATHING, COGNITIVE_REFRAMING, SLEEP_HYGIENE
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'ASSIGNED', -- ASSIGNED, COMPLETED, SKIPPED
+                patient_rating INTEGER, -- 1-5 effectiveness
+                patient_feedback TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
+
+            // Dedicated Safety & Crisis Screenings
+            db.run(`CREATE TABLE IF NOT EXISTS Safety_Screenings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                trigger_source TEXT NOT NULL, -- INTAKE, ASSESSMENT, CHAT_CONVERSATION
+                self_harm_flag BOOLEAN DEFAULT 0,
+                suicide_ideation_flag BOOLEAN DEFAULT 0,
+                crisis_details TEXT,
+                escalation_status TEXT DEFAULT 'NONE', -- NONE, NOTIFIED, ESCALATED
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+            )`);
+
+            // Clinician Care Plans
+            db.run(`CREATE TABLE IF NOT EXISTS Care_Plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                clinician_id INTEGER NOT NULL,
+                primary_diagnosis_notes TEXT,
+                goals TEXT,
+                recommended_interventions TEXT,
+                follow_up_date DATE,
+                status TEXT DEFAULT 'ACTIVE', -- ACTIVE, COMPLETED, REVISED
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES Users(id) ON DELETE CASCADE,
+                FOREIGN KEY (clinician_id) REFERENCES Doctors(id) ON DELETE CASCADE
+            )`);
+
+            // Centralized Immutable Audit Logs
+            db.run(`CREATE TABLE IF NOT EXISTS Audit_Logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                user_id INTEGER,
+                actor_id INTEGER,
+                actor_role TEXT, -- PATIENT, CLINICIAN, SYSTEM
+                details TEXT,
+                ip_address TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
         });
     }
 });

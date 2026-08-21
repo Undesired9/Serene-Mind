@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../database/sqlite');
 const { verifyToken } = require('../middleware/auth');
+const { logAuditEvent } = require('../services/auditLogger');
+const { evaluateMultiSignalRisk } = require('../services/riskEngine');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_serenemind_key_change_in_prod';
 
@@ -412,6 +414,8 @@ router.post('/intake', verifyToken, async (req, res) => {
             insertValues
         );
 
+        logAuditEvent('INTAKE_COMPLETED', userId, userId, 'PATIENT', { presentingProblem: fields.presenting_problem });
+
         res.status(201).json({ message: 'Intake form saved successfully.' });
     } catch (err) {
         console.error('Intake save error:', err);
@@ -477,6 +481,8 @@ router.post('/doctor/register', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        logAuditEvent('LOGIN', result.lastID, result.lastID, 'CLINICIAN', { action: 'Doctor registered' });
+
         res.status(201).json({
             message: 'Doctor account created successfully',
             token,
@@ -536,6 +542,8 @@ router.post('/doctor/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        logAuditEvent('LOGIN', doctor.id, doctor.id, 'CLINICIAN', { action: 'Doctor logged in' });
+
         res.json({
             message: 'Doctor login successful',
             token,
@@ -560,8 +568,6 @@ router.post('/doctor/login', async (req, res) => {
 router.delete('/account', verifyToken, (req, res) => {
     const userId = req.user.id;
     
-    // SQLite with ON DELETE CASCADE applied to Sessions and Mood_Logs 
-    // will auto-delete related rows when the user is deleted here.
     const sql = `DELETE FROM Users WHERE id = ?`;
     
     db.run(sql, [userId], function(err) {
@@ -569,12 +575,13 @@ router.delete('/account', verifyToken, (req, res) => {
             console.error('Account deletion error:', err);
             return res.status(500).json({ error: 'Failed to delete account. Please try again later.' });
         }
+        logAuditEvent('ACCOUNT_DELETED', userId, userId, 'PATIENT');
         res.json({ message: 'Account and all associated personal data have been permanently deleted.' });
     });
 });
 
-// Submit Clinical Assessment (21 questions)
-router.post('/assessment', verifyToken, (req, res) => {
+// Submit Clinical Assessment (PHQ-9 & GAD-7)
+router.post('/assessment', verifyToken, async (req, res) => {
     const userId = req.user.id;
     const { 
         answers, 
@@ -582,41 +589,73 @@ router.post('/assessment', verifyToken, (req, res) => {
         anxietyScore, 
         stressScore, 
         totalScore, 
+        phq9_score,
+        gad7_score,
         mainConcerns, 
         selfHarmRisk 
     } = req.body; 
 
-    if (!answers || !Array.isArray(answers) || answers.length !== 21) {
-        return res.status(400).json({ error: 'Invalid assessment format. Expected 21 answers.' });
-    }
+    const phq = typeof phq9_score === 'number' ? phq9_score : (typeof depressionScore === 'number' ? depressionScore : 0);
+    const gad = typeof gad7_score === 'number' ? gad7_score : (typeof anxietyScore === 'number' ? anxietyScore : 0);
+    const total = typeof totalScore === 'number' ? totalScore : (phq + gad);
+    const ansArray = Array.isArray(answers) ? answers : [];
 
     const sql = `
         INSERT INTO Assessments (
             user_id, answers, depression_score, anxiety_score, stress_score, 
             total_score, main_concern, self_harm_risk
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            answers = excluded.answers,
+            depression_score = excluded.depression_score,
+            anxiety_score = excluded.anxiety_score,
+            stress_score = excluded.stress_score,
+            total_score = excluded.total_score,
+            main_concern = excluded.main_concern,
+            self_harm_risk = excluded.self_harm_risk,
+            timestamp = CURRENT_TIMESTAMP
     `;
 
     const params = [
         userId, 
-        JSON.stringify(answers), 
-        depressionScore, 
-        anxietyScore, 
-        stressScore, 
-        totalScore, 
-        mainConcerns, 
+        JSON.stringify(ansArray), 
+        phq, 
+        gad, 
+        stressScore || 0, 
+        total, 
+        mainConcerns || '', 
         selfHarmRisk ? 1 : 0
     ];
 
-    db.run(sql, params, function(err) {
+    db.run(sql, params, async function(err) {
         if (err) {
             console.error('Assessment insert error:', err);
-            if (err.message.includes('UNIQUE')) {
-                 return res.status(400).json({ error: 'Assessment already completed.' });
-            }
             return res.status(500).json({ error: 'Failed to save assessment.' });
         }
-        res.status(201).json({ message: 'Assessment saved successfully' });
+
+        // Record Safety Screening
+        if (selfHarmRisk) {
+            db.run(`INSERT INTO Safety_Screenings (user_id, trigger_source, self_harm_flag, suicide_ideation_flag, crisis_details, escalation_status)
+                    VALUES (?, 'ASSESSMENT', 1, 1, 'Self-harm or crisis flag active on screening questionnaire', 'ESCALATED')`, [userId]);
+            logAuditEvent('SAFETY_SCREEN_COMPLETED', userId, userId, 'PATIENT', { flag: 'POSITIVE' });
+        } else {
+            logAuditEvent('SAFETY_SCREEN_COMPLETED', userId, userId, 'PATIENT', { flag: 'NEGATIVE' });
+        }
+
+        logAuditEvent('PHQ9_COMPLETED', userId, userId, 'PATIENT', { score: phq });
+        logAuditEvent('GAD7_COMPLETED', userId, userId, 'PATIENT', { score: gad });
+
+        // Trigger Multi-Signal Risk Engine
+        const riskEvaluation = await evaluateMultiSignalRisk(userId);
+
+        res.status(201).json({ 
+            message: 'Assessment saved successfully',
+            riskEvaluation,
+            user: {
+                id: userId,
+                needsAssessment: false
+            }
+        });
     });
 });
 

@@ -207,15 +207,27 @@ const DoctorDashboard = () => {
     }, []);
 
     const filteredPatients = useMemo(() => {
-        const query = searchTerm.trim().toLowerCase();
-        if (!query) return patients;
+        let list = patients;
 
-        return patients.filter((patient) =>
+        if (activeTab === 'critical') {
+            list = patients.filter(p => p.risk_level === 'CRITICAL' || p.crisis_risk);
+        } else if (activeTab === 'high') {
+            list = patients.filter(p => p.risk_level === 'HIGH');
+        } else if (activeTab === 'monitoring') {
+            list = patients.filter(p => p.risk_level === 'MODERATE');
+        } else if (activeTab === 'stable') {
+            list = patients.filter(p => p.risk_level === 'LOW' || (!p.risk_level && !p.crisis_risk));
+        }
+
+        const query = searchTerm.trim().toLowerCase();
+        if (!query) return list;
+
+        return list.filter((patient) =>
             patient.username.toLowerCase().includes(query) ||
             patient.email.toLowerCase().includes(query) ||
             (patient.main_concern || '').toLowerCase().includes(query)
         );
-    }, [patients, searchTerm]);
+    }, [patients, searchTerm, activeTab]);
 
     const dashboardStats = useMemo(() => {
         const highRisk = patients.filter((patient) => patient.crisis_risk).length;
@@ -382,29 +394,61 @@ const DoctorDashboard = () => {
                     <StatCard icon={<Heart className="text-[#1B98E0]" />} label="Average logged mood" value={dashboardStats.avgMood === '--' ? '--' : `${dashboardStats.avgMood}/10`} tone="bg-sky-50 border-sky-100 text-[#1B98E0]" />
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-4 border-b border-[#0E7C7B]/20 pb-2">
+                {/* Triage Queues Tabs */}
+                <div className="flex flex-wrap gap-2 border-b border-[#0E7C7B]/20 pb-2">
+                    <button 
+                        onClick={() => setActiveTab('critical')}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === 'critical' 
+                            ? 'bg-rose-500 text-white shadow-sm' 
+                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}
+                    >
+                        <AlertTriangle size={14} /> Critical Attention ({patients.filter(p => p.risk_level === 'CRITICAL' || p.crisis_risk).length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('high')}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === 'high' 
+                            ? 'bg-amber-500 text-white shadow-sm' 
+                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
+                    >
+                        High Priority ({patients.filter(p => p.risk_level === 'HIGH').length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('monitoring')}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === 'monitoring' 
+                            ? 'bg-sky-500 text-white shadow-sm' 
+                            : 'bg-sky-50 text-sky-700 hover:bg-sky-100'}`}
+                    >
+                        Monitoring ({patients.filter(p => p.risk_level === 'MODERATE').length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('stable')}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === 'stable' 
+                            ? 'bg-emerald-500 text-white shadow-sm' 
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                    >
+                        Stable ({patients.filter(p => p.risk_level === 'LOW' || (!p.risk_level && !p.crisis_risk)).length})
+                    </button>
                     <button 
                         onClick={() => setActiveTab('patients')}
-                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'patients' 
-                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
-                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors ${activeTab === 'patients' 
+                            ? 'bg-[#0E7C7B] text-white shadow-sm' 
+                            : 'bg-white text-[#3D5A80] hover:bg-[#C2FFF0]/30'}`}
                     >
-                        Patients
+                        All Patients ({patients.length})
                     </button>
                     <button 
                         onClick={() => setActiveTab('appointments')}
-                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'appointments' 
-                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
-                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === 'appointments' 
+                            ? 'bg-[#0E7C7B] text-white shadow-sm' 
+                            : 'bg-white text-[#3D5A80] hover:bg-[#C2FFF0]/30'}`}
                     >
-                        Appointments
+                        <Calendar size={14} /> Appointments
                     </button>
                     <button 
                         onClick={() => setActiveTab('availability')}
-                        className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${activeTab === 'availability' 
-                            ? 'bg-[#C2FFF0]/30 text-[#0E7C7B] border-b-2 border-[#0E7C7B]' 
-                            : 'text-[#3D5A80] hover:text-[#0D1B2A]'}`}
+                        className={`px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-colors ${activeTab === 'availability' 
+                            ? 'bg-[#0E7C7B] text-white shadow-sm' 
+                            : 'bg-white text-[#3D5A80] hover:bg-[#C2FFF0]/30'}`}
                     >
                         Availability
                     </button>
@@ -469,12 +513,14 @@ const DoctorDashboard = () => {
                     </div>
                 )}
 
-                {activeTab === 'patients' && (
+                {['patients', 'critical', 'high', 'monitoring', 'stable'].includes(activeTab) && (
                     <div className="bg-white/60 backdrop-blur-md border border-[#0E7C7B]/15 rounded-3xl p-4 md:p-5 shadow-sm">
                         <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
                             <div>
-                                <h2 className="text-lg font-semibold text-[#0D1B2A]">Patient roster</h2>
-                                <p className="text-sm text-[#3D5A80]">{filteredPatients.length} of {patients.length} patients shown, {dashboardStats.assessed} with completed screening.</p>
+                                <h2 className="text-lg font-semibold text-[#0D1B2A] capitalize">
+                                    {activeTab === 'critical' ? '🚨 Critical Attention Queue' : activeTab === 'high' ? '⚠️ High Priority Queue' : activeTab === 'monitoring' ? '🔍 Monitoring Queue' : activeTab === 'stable' ? '✅ Stable Patient Queue' : 'Patient roster'}
+                                </h2>
+                                <p className="text-sm text-[#3D5A80]">{filteredPatients.length} patients in this view, {dashboardStats.assessed} with completed screening.</p>
                             </div>
                             <label className="flex items-center gap-3 bg-[#E8E8E8]/80 border border-[#0E7C7B]/10 rounded-2xl px-4 py-3 min-w-0 md:min-w-[320px]">
                                 <Search size={18} className="text-[#3D5A80]" />
@@ -490,7 +536,7 @@ const DoctorDashboard = () => {
                 )}
 
 
-                {activeTab === 'patients' && (
+                {['patients', 'critical', 'high', 'monitoring', 'stable'].includes(activeTab) && (
                     <>
                         {loading ? (
                             <div className="h-[300px] w-full flex items-center justify-center">

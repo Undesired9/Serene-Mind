@@ -56,34 +56,68 @@ export default function DoctorDashboardScreen() {
             {/* Tab Selector */}
             <View style={styles.tabRow}>
                 <TouchableOpacity
-                    style={[styles.tabBtn, activeTab === 'patients' && styles.tabBtnActive]}
-                    onPress={() => setActiveTab('patients')}
+                    style={[styles.tabBtn, activeTab === 'critical' && styles.tabBtnCritical]}
+                    onPress={() => setActiveTab('critical')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'patients' && styles.tabTextActive]}>
-                        Patient Risk List ({patients.length})
+                    <Text style={[styles.tabText, activeTab === 'critical' && styles.tabTextActive]}>
+                        🚨 Critical ({patients.filter(p => p.risk_level === 'CRITICAL' || p.crisis_risk).length})
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.tabBtn, activeTab === 'appointments' && styles.tabBtnActive]}
-                    onPress={() => setActiveTab('appointments')}
+                    style={[styles.tabBtn, activeTab === 'high' && styles.tabBtnHigh]}
+                    onPress={() => setActiveTab('high')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'appointments' && styles.tabTextActive]}>
-                        Appointments ({appointments.length})
+                    <Text style={[styles.tabText, activeTab === 'high' && styles.tabTextActive]}>
+                        ⚠️ High ({patients.filter(p => p.risk_level === 'HIGH').length})
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.tabBtn, activeTab === 'monitoring' && styles.tabBtnMonitoring]}
+                    onPress={() => setActiveTab('monitoring')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'monitoring' && styles.tabTextActive]}>
+                        🔍 Monitor ({patients.filter(p => p.risk_level === 'MODERATE').length})
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.tabBtn, activeTab === 'stable' && styles.tabBtnStable]}
+                    onPress={() => setActiveTab('stable')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'stable' && styles.tabTextActive]}>
+                        ✅ Stable ({patients.filter(p => p.risk_level === 'LOW' || (!p.risk_level && !p.crisis_risk)).length})
                     </Text>
                 </TouchableOpacity>
             </View>
 
-            {activeTab === 'patients' ? (
+            {activeTab !== 'appointments' ? (
                 <FlatList
-                    data={patients}
+                    data={
+                        activeTab === 'critical' 
+                            ? patients.filter(p => p.risk_level === 'CRITICAL' || p.crisis_risk)
+                            : activeTab === 'high'
+                            ? patients.filter(p => p.risk_level === 'HIGH')
+                            : activeTab === 'monitoring'
+                            ? patients.filter(p => p.risk_level === 'MODERATE')
+                            : activeTab === 'stable'
+                            ? patients.filter(p => p.risk_level === 'LOW' || (!p.risk_level && !p.crisis_risk))
+                            : patients
+                    }
                     keyExtractor={item => item.id.toString()}
                     contentContainerStyle={styles.listContent}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDoctorData(); }} />}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>No patients currently in this triage queue.</Text>
+                        </View>
+                    }
                     renderItem={({ item }) => {
                         const phq = item.phq9_score ?? 'N/A';
                         const gad = item.gad7_score ?? 'N/A';
                         const isHighRisk = (typeof phq === 'number' && phq >= 15) || (typeof gad === 'number' && gad >= 15);
+                        const isCritical = item.risk_level === 'CRITICAL' || item.crisis_risk;
 
                         return (
                             <View style={styles.patientCard}>
@@ -92,17 +126,27 @@ export default function DoctorDashboardScreen() {
                                         <Text style={styles.patientName}>{item.full_name || item.email}</Text>
                                         <Text style={styles.patientEmail}>{item.email}</Text>
                                     </View>
-                                    <View style={[styles.riskBadge, isHighRisk ? styles.riskHigh : styles.riskLow]}>
-                                        <Text style={styles.riskText}>{isHighRisk ? 'High Risk' : 'Moderate/Low'}</Text>
+                                    <View style={[
+                                        styles.riskBadge, 
+                                        isCritical ? styles.riskCritical : (isHighRisk ? styles.riskHigh : styles.riskLow)
+                                    ]}>
+                                        <Text style={styles.riskText}>
+                                            {isCritical ? '🚨 Critical' : (isHighRisk ? 'High Risk' : 'Moderate/Low')}
+                                        </Text>
                                     </View>
                                 </View>
 
                                 <View style={styles.scoresRow}>
                                     <Text style={styles.scoreText}>PHQ-9: <Text style={{ fontWeight: 'bold' }}>{phq}</Text></Text>
                                     <Text style={styles.scoreText}>GAD-7: <Text style={{ fontWeight: 'bold' }}>{gad}</Text></Text>
+                                    <Text style={styles.scoreText}>Risk: <Text style={{ fontWeight: 'bold', color: isCritical ? '#DC2626' : '#0E7C7B' }}>{item.risk_level || 'LOW'}</Text></Text>
                                 </View>
 
-                                {item.medical_history ? (
+                                {item.presenting_problem ? (
+                                    <Text style={styles.historyText} numberOfLines={2}>
+                                        Concern: {item.presenting_problem}
+                                    </Text>
+                                ) : item.medical_history ? (
                                     <Text style={styles.historyText} numberOfLines={2}>
                                         Medical: {item.medical_history}
                                     </Text>
@@ -234,11 +278,38 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 8
     },
+    tabBtnCritical: {
+        backgroundColor: '#EF4444'
+    },
+    tabBtnHigh: {
+        backgroundColor: '#F59E0B'
+    },
+    tabBtnMonitoring: {
+        backgroundColor: '#0284C7'
+    },
+    tabBtnStable: {
+        backgroundColor: '#10B981'
+    },
+    riskCritical: {
+        backgroundColor: '#FEE2E2',
+        borderWidth: 1,
+        borderColor: '#EF4444'
+    },
     riskHigh: {
-        backgroundColor: '#FEE2E2'
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#F59E0B'
     },
     riskLow: {
         backgroundColor: '#E0F2FE'
+    },
+    emptyContainer: {
+        padding: 24,
+        alignItems: 'center'
+    },
+    emptyText: {
+        color: '#64748B',
+        fontSize: 13
     },
     riskText: {
         fontSize: 10,

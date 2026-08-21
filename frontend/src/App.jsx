@@ -96,7 +96,15 @@ const MainLayout = ({ children }) => {
     <div className="flex flex-col md:flex-row h-screen bg-[#E8E8E8] text-[#0D1B2A] font-sans overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col relative w-full h-full overflow-y-auto pb-16 md:pb-0">
-         {children}
+        {/* Phase 0 Emergency Crisis Bar */}
+        <div className="bg-[#0D1B2A] text-white px-4 py-1.5 text-xs flex items-center justify-between shadow-sm z-10">
+          <div className="flex items-center gap-2">
+            <span className="bg-red-500 text-white font-bold px-1.5 py-0.5 rounded text-[10px]">24/7 CRISIS</span>
+            <span className="text-gray-200">If you are in immediate distress, call or text the Suicide & Crisis Lifeline at <strong className="text-[#C2FFF0]">988</strong></span>
+          </div>
+          <span className="hidden md:inline text-gray-400 text-[11px]">Non-Diagnostic AI Support</span>
+        </div>
+        {children}
       </div>
     </div>
   );

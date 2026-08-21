@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { handleChat } = require('../services/aiService');
+const { evaluateMultiSignalRisk } = require('../services/riskEngine');
+const { getRecommendedInterventions } = require('../services/interventionEngine');
+const { logAuditEvent } = require('../services/auditLogger');
 const { verifyToken } = require('../middleware/auth');
 const db = require('../database/sqlite');
 
@@ -214,7 +217,7 @@ router.get('/sessions/:sessionId/history', verifyToken, (req, res) => {
 async function getUserAssessment(userId) {
     return new Promise((resolve, reject) => {
         db.get(
-            `SELECT * FROM Assessments WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+            `SELECT * FROM Assessments WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1`,
             [userId],
             (err, row) => {
                 if (err) return reject(err);
@@ -234,21 +237,13 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     try {
-        // Check if user's chat is locked
-        const escalationStatus = await getOrCreateUserEscalationStatus(userId);
-        if (escalationStatus.is_chat_locked) {
-            return res.status(403).json({ 
-                error: 'Chat is locked. Please book an appointment first.',
-                escalationStatus 
-            });
-        }
+        // Multi-Signal Risk Evaluation (Deterministic Preprocessor)
+        const multiSignalEval = await evaluateMultiSignalRisk(userId, { messageText: message });
+        const isCritical = multiSignalEval.isCrisis;
 
         if (!sessionId) {
             sessionId = await getOrCreateTodaySession(userId);
         }
-
-        // Get user's assessment
-        const assessment = await getUserAssessment(userId);
 
         // 1. Instantly save the user's message to the SQL DB
         await new Promise((resolve, reject) => {
@@ -260,34 +255,64 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 2. Process via AI service with assessment data
+        // 2. If Critical Risk flagged, send safe crisis fallback immediately
+        if (isCritical) {
+            const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the 988 Suicide & Crisis Lifeline (call/text 988) or reach out to emergency services immediately. You do not have to carry this alone.";
+            
+            await new Promise((resolve, reject) => {
+                db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, 'CRITICAL', 95, ?)`, 
+                [userId, crisisReply, sessionId], 
+                function(err) {
+                    if (err) reject(err);
+                    resolve();
+                });
+            });
+
+            await updateUserEscalationStatus(userId, 95, 'CRITICAL', false);
+
+            return res.json({
+                reply: crisisReply,
+                riskLevel: 'CRITICAL',
+                riskScore: 95,
+                riskTier: 'CRITICAL',
+                isCrisis: true,
+                interventions: getRecommendedInterventions('CRITICAL', message),
+                sessionId
+            });
+        }
+
+        // 3. Process via AI service with assessment data
+        const assessment = await getUserAssessment(userId);
         const responseData = await handleChat(message, history, assessment);
         
-        // 3. Save AI's response to SQL DB
+        // 4. Save AI's response to SQL DB
         await new Promise((resolve, reject) => {
             db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
-            [userId, responseData.reply, responseData.riskLevel, responseData.riskScore, sessionId], 
+            [userId, responseData.reply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
             function(err) {
                 if (err) reject(err);
                 resolve();
             });
         });
 
-        // 4. Update user's escalation status and lock chat if needed
-        const shouldLockChat = responseData.riskTier === 'HIGH' || responseData.riskTier === 'CRITICAL';
+        // 5. Update user's escalation status
         await updateUserEscalationStatus(
             userId, 
-            responseData.riskScore, 
-            responseData.riskTier, 
-            shouldLockChat
+            multiSignalEval.riskScore, 
+            multiSignalEval.riskLevel, 
+            false
         );
 
-        // 5. Return response with updated escalation status
-        const updatedEscalationStatus = await getOrCreateUserEscalationStatus(userId);
+        // 6. Return response with recommended structured interventions
+        const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
+
         res.json({ 
             ...responseData, 
-            sessionId,
-            escalationStatus: updatedEscalationStatus
+            riskLevel: multiSignalEval.riskLevel,
+            riskScore: multiSignalEval.riskScore,
+            riskTier: multiSignalEval.riskLevel,
+            interventions: recommendedInterventions,
+            sessionId
         });
     } catch (error) {
         console.error('Chat routing error:', error);
