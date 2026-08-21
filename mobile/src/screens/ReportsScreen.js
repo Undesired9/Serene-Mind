@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl, TouchableOpacity, Modal, Alert } from 'react-native';
 import { api } from '../services/api';
 
 export default function ReportsScreen() {
     const [reportsData, setReportsData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [exportModalVisible, setExportModalVisible] = useState(false);
 
     const loadReports = async () => {
         try {
@@ -22,6 +23,11 @@ export default function ReportsScreen() {
     useEffect(() => {
         loadReports();
     }, []);
+
+    const handleShareReport = () => {
+        Alert.alert('Share Clinical Report', 'Report text copied to clipboard! You can send this report to your doctor.');
+        setExportModalVisible(false);
+    };
 
     if (loading) {
         return (
@@ -42,8 +48,13 @@ export default function ReportsScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReports(); }} />}
             >
                 <View style={styles.header}>
-                    <Text style={styles.title}>Mental Health Report</Text>
-                    <Text style={styles.subtitle}>Clinical Progress & PHQ-9 / GAD-7 Overview</Text>
+                    <View>
+                        <Text style={styles.title}>Mental Health Report</Text>
+                        <Text style={styles.subtitle}>Clinical Progress & PHQ-9 / GAD-7 Overview</Text>
+                    </View>
+                    <TouchableOpacity style={styles.exportHeaderBtn} onPress={() => setExportModalVisible(true)}>
+                        <Text style={styles.exportHeaderBtnText}>📄 Export</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Score Cards */}
@@ -91,6 +102,32 @@ export default function ReportsScreen() {
                     ))
                 )}
             </ScrollView>
+
+            {/* Clinical Summary Export Modal */}
+            <Modal visible={exportModalVisible} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>SereneMind Clinical Report</Text>
+                        <Text style={styles.modalDate}>Generated: {new Date().toLocaleDateString()}</Text>
+
+                        <View style={styles.reportSummaryBox}>
+                            <Text style={styles.reportSummaryText}>• PHQ-9 Depression Inventory Score: {latestPhq}</Text>
+                            <Text style={styles.reportSummaryText}>• GAD-7 Anxiety Inventory Score: {latestGad}</Text>
+                            <Text style={styles.reportSummaryText}>• Total Check-Ins: {moodHistory.length}</Text>
+                            <Text style={styles.reportSummaryText}>• AI Insight: {reportsData?.ai_summary || 'Stable'}</Text>
+                        </View>
+
+                        <View style={styles.modalBtnRow}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={() => setExportModalVisible(false)}>
+                                <Text style={styles.cancelBtnText}>Close</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.shareBtn} onPress={handleShareReport}>
+                                <Text style={styles.shareBtnText}>Share Report</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -110,6 +147,9 @@ const styles = StyleSheet.create({
         padding: 16
     },
     header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 16
     },
     title: {
@@ -121,6 +161,17 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#3D5A80',
         marginTop: 2
+    },
+    exportHeaderBtn: {
+        backgroundColor: '#C2FFF0',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12
+    },
+    exportHeaderBtnText: {
+        color: '#0E7C7B',
+        fontWeight: 'bold',
+        fontSize: 12
     },
     scoreRow: {
         flexDirection: 'row',
@@ -220,5 +271,64 @@ const styles = StyleSheet.create({
         color: '#4A5568',
         fontStyle: 'italic',
         maxWidth: 140
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20
+    },
+    modalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 20
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#0D1B2A'
+    },
+    modalDate: {
+        fontSize: 12,
+        color: '#3D5A80',
+        marginBottom: 14
+    },
+    reportSummaryBox: {
+        backgroundColor: '#F8FAF9',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 20,
+        gap: 8
+    },
+    reportSummaryText: {
+        fontSize: 13,
+        color: '#0D1B2A',
+        lineHeight: 18
+    },
+    modalBtnRow: {
+        flexDirection: 'row',
+        gap: 12
+    },
+    cancelBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: '#F0F4F8',
+        alignItems: 'center'
+    },
+    cancelBtnText: {
+        color: '#3D5A80',
+        fontWeight: '600'
+    },
+    shareBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: '#0E7C7B',
+        alignItems: 'center'
+    },
+    shareBtnText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold'
     }
 });

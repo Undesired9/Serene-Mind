@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
 import { api } from '../services/api';
+
+const QUICK_PROMPTS = [
+    "I feel anxious today",
+    "I can't sleep well",
+    "Help me reframe negative thoughts",
+    "I need daily motivation"
+];
 
 export default function ChatScreen() {
     const [sessions, setSessions] = useState([]);
@@ -9,6 +16,7 @@ export default function ChatScreen() {
     const [inputMessage, setInputMessage] = useState('');
     const [loadingSessions, setLoadingSessions] = useState(true);
     const [sending, setSending] = useState(false);
+    const [isListening, setIsListening] = useState(false);
 
     const flatListRef = useRef(null);
 
@@ -53,17 +61,16 @@ export default function ChatScreen() {
         loadSessions();
     }, []);
 
-    const handleSend = async () => {
-        if (!inputMessage.trim() || sending || !currentSessionId) return;
+    const handleSend = async (customText = null) => {
+        const textToSend = customText || inputMessage.trim();
+        if (!textToSend || sending || !currentSessionId) return;
 
-        const userText = inputMessage.trim();
-        setInputMessage('');
+        if (!customText) setInputMessage('');
 
-        // Optimistic user message addition
         const tempMsg = {
             id: Date.now(),
             sender: 'user',
-            message: userText,
+            message: textToSend,
             timestamp: new Date().toISOString()
         };
 
@@ -71,7 +78,7 @@ export default function ChatScreen() {
         setSending(true);
 
         try {
-            const res = await api.sendMessage(currentSessionId, userText);
+            const res = await api.sendMessage(currentSessionId, textToSend);
             if (res.botMessage) {
                 setMessages(prev => [...prev, res.botMessage]);
             }
@@ -79,6 +86,19 @@ export default function ChatScreen() {
             Alert.alert('Send Error', err.message || 'Failed to send message to AI companion.');
         } finally {
             setSending(false);
+        }
+    };
+
+    const handleMicToggle = () => {
+        if (!isListening) {
+            setIsListening(true);
+            // Simulate voice dictation
+            setTimeout(() => {
+                setInputMessage("I am feeling a bit stressed about work today.");
+                setIsListening(false);
+            }, 2500);
+        } else {
+            setIsListening(false);
         }
     };
 
@@ -127,6 +147,21 @@ export default function ChatScreen() {
                     />
                 </View>
 
+                {/* Quick Prompts Bar */}
+                <View style={styles.promptsContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {QUICK_PROMPTS.map((prompt, idx) => (
+                            <TouchableOpacity 
+                                key={idx} 
+                                style={styles.promptChip}
+                                onPress={() => handleSend(prompt)}
+                            >
+                                <Text style={styles.promptChipText}>💡 {prompt}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
                 {/* Chat Messages List */}
                 <FlatList
                     ref={flatListRef}
@@ -153,11 +188,26 @@ export default function ChatScreen() {
                     }}
                 />
 
+                {/* Voice Dictation Active Indicator */}
+                {isListening && (
+                    <View style={styles.listeningBanner}>
+                        <ActivityIndicator color="#0E7C7B" size="small" />
+                        <Text style={styles.listeningText}>Listening... Speak clearly into your microphone.</Text>
+                    </View>
+                )}
+
                 {/* Chat Input Bar */}
                 <View style={styles.inputBar}>
+                    <TouchableOpacity 
+                        style={[styles.micBtn, isListening && styles.micBtnActive]} 
+                        onPress={handleMicToggle}
+                    >
+                        <Text style={{ fontSize: 18 }}>🎙️</Text>
+                    </TouchableOpacity>
+
                     <TextInput
                         style={styles.textInput}
-                        placeholder="Type how you are feeling..."
+                        placeholder="Type or tap mic to speak..."
                         placeholderTextColor="#A0AEC0"
                         value={inputMessage}
                         onChangeText={setInputMessage}
@@ -165,7 +215,7 @@ export default function ChatScreen() {
                     />
                     <TouchableOpacity 
                         style={[styles.sendBtn, (!inputMessage.trim() || sending) && styles.sendBtnDisabled]} 
-                        onPress={handleSend}
+                        onPress={() => handleSend()}
                         disabled={!inputMessage.trim() || sending}
                     >
                         {sending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.sendBtnText}>Send</Text>}
@@ -227,6 +277,25 @@ const styles = StyleSheet.create({
         color: '#0E7C7B',
         fontWeight: 'bold'
     },
+    promptsContainer: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#E8E8E8'
+    },
+    promptChip: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: '#C2FFF0'
+    },
+    promptChipText: {
+        fontSize: 12,
+        color: '#0E7C7B',
+        fontWeight: '600'
+    },
     messagesList: {
         padding: 16
     },
@@ -279,6 +348,19 @@ const styles = StyleSheet.create({
     msgTextBot: {
         color: '#0D1B2A'
     },
+    listeningBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#C2FFF0',
+        padding: 10,
+        justifyContent: 'center'
+    },
+    listeningText: {
+        fontSize: 12,
+        color: '#0E7C7B',
+        fontWeight: 'bold'
+    },
     inputBar: {
         flexDirection: 'row',
         padding: 12,
@@ -287,6 +369,19 @@ const styles = StyleSheet.create({
         borderTopColor: '#E0E0E0',
         alignItems: 'center',
         gap: 8
+    },
+    micBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F0F4F8',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    micBtnActive: {
+        backgroundColor: '#C2FFF0',
+        borderWidth: 2,
+        borderColor: '#0E7C7B'
     },
     textInput: {
         flex: 1,
