@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
+import { API_BASE } from '../apiConfig';
 
 const questionsData = [
     // Depression
@@ -106,7 +107,7 @@ const Assessment = () => {
 
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/auth/assessment', {
+            const response = await fetch(`${API_BASE}/api/auth/assessment`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

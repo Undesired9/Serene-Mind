@@ -4,6 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import DailyCheckIn from './DailyCheckIn';
+import { API_BASE } from '../apiConfig';
 
 const Dashboard = () => {
     const { t } = useTranslation();
@@ -24,12 +25,14 @@ const Dashboard = () => {
     const fetchStats = async () => {
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/dashboard/stats', {
+            const response = await fetch(`${API_BASE}/api/dashboard/stats`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
                 const data = await response.json();
                 setStats(data);
+            } else {
+                console.error('Failed to fetch stats:', response.status);
             }
         } catch (error) {
             console.error('Failed to fetch stats', error);
@@ -41,7 +44,7 @@ const Dashboard = () => {
     const fetchReports = async () => {
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/dashboard/reports', {
+            const response = await fetch(`${API_BASE}/api/dashboard/reports`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {

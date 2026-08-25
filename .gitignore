@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment files (contain secrets - never commit)
+backend/.env
+frontend/.env
+.env
+
+# API keys / credentials
+backend/kaggle.json
+*.kaggle.json
+
+# Databases
+backend/database/*.db
+backend/database/*.db-journal
+backend/database/*.db-wal
+backend/database/*.db-shm
+
+# Build output
+frontend/dist/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Agent / opencode tooling
+.opencode/
+AGENTS.md
+*.canvas
+*.base

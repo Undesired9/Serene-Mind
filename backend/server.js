@@ -33,6 +33,17 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/health', healthRoutes);
 
+// 404 handler for undefined routes
+app.use((req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

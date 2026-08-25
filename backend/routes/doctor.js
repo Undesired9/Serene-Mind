@@ -117,20 +117,25 @@ router.get('/patients/:id', verifyToken, requireDoctor, (req, res) => {
                             db.all(`SELECT * FROM Appointments WHERE patient_id = ? ORDER BY appointment_datetime DESC`, [patientId], (err, appointments) => {
                                 if (err) return res.status(500).json({ error: 'Database error fetching appointments' });
 
-                                res.json({
-                                    user,
-                                    intake: intake || null,
-                                    assessment: assessment ? {
-                                        ...assessment,
-                                        phq9_score: assessment.depression_score,
-                                        gad7_score: assessment.anxiety_score,
-                                        severity: getSeverity(assessment.total_score),
-                                        crisis_risk: !!assessment.self_harm_risk
-                                    } : null,
-                                    mood_logs: mood_logs || [],
-                                    risk_evaluations: riskEvaluations || [],
-                                    care_plans: carePlans || [],
-                                    appointments: appointments || []
+                                db.all(`SELECT id, sender, content, risk_level, risk_score, timestamp, session_id FROM Sessions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`, [patientId], (err, sessions) => {
+                                    if (err) return res.status(500).json({ error: 'Database error fetching sessions' });
+
+                                    res.json({
+                                        user,
+                                        intake: intake || null,
+                                        assessment: assessment ? {
+                                            ...assessment,
+                                            phq9_score: assessment.depression_score,
+                                            gad7_score: assessment.anxiety_score,
+                                            severity: getSeverity(assessment.total_score),
+                                            crisis_risk: !!assessment.self_harm_risk
+                                        } : null,
+                                        mood_logs: mood_logs || [],
+                                        risk_evaluations: riskEvaluations || [],
+                                        care_plans: carePlans || [],
+                                        appointments: appointments || [],
+                                        sessions: sessions || []
+                                    });
                                 });
                             });
                         });

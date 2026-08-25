@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_serenemind_key_change_in_prod';
+const { JWT_SECRET } = require('../config');
 
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];

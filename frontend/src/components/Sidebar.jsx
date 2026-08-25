@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, MessageSquare, Activity, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Users, FileText, Calendar, Menu, X } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { API_BASE } from '../apiConfig';
 
 const Sidebar = () => {
     const { t } = useTranslation();
@@ -25,7 +26,7 @@ const Sidebar = () => {
         try {
             const token = localStorage.getItem('serene_token');
             if (!token) return;
-            const response = await fetch('http://localhost:5000/api/chat/sessions', {
+            const response = await fetch(`${API_BASE}/api/chat/sessions`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
@@ -48,7 +49,7 @@ const Sidebar = () => {
         e.stopPropagation();
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/chat/sessions', {
+            const response = await fetch(`${API_BASE}/api/chat/sessions`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

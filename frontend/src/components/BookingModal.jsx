@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, User, CheckCircle } from 'lucide-react';
-
-const API_BASE = 'http://localhost:5000';
+import { API_BASE } from '../apiConfig';
 
 const BookingModal = ({ isOpen, onClose, onBooked }) => {
     const [doctors, setDoctors] = useState([]);

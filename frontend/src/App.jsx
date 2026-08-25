@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
@@ -13,16 +13,25 @@ import DoctorDashboard from './components/DoctorDashboard';
 import DoctorLogin from './components/DoctorLogin';
 import PatientAppointments from './components/PatientAppointments';
 
+const parseUser = () => {
+  try {
+    const userStr = localStorage.getItem('serene_user');
+    return userStr ? JSON.parse(userStr) : null;
+  } catch {
+    localStorage.removeItem('serene_user');
+    localStorage.removeItem('serene_token');
+    return null;
+  }
+};
+
 // A protective wrapper that also enforces the Assessment requirement
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('serene_token');
-  const userStr = localStorage.getItem('serene_user');
+  const user = parseUser();
   
-  if (!token || !userStr) {
+  if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
-
-  const user = JSON.parse(userStr);
 
   if (user.role === 'doctor') {
     return <Navigate to="/doctor" replace />;
@@ -43,11 +52,10 @@ const ProtectedRoute = ({ children }) => {
 // Assessment Wrapper to prevent re-taking
 const AssessmentRoute = ({ children }) => {
   const token = localStorage.getItem('serene_token');
-  const userStr = localStorage.getItem('serene_user');
+  const user = parseUser();
   
-  if (!token || !userStr) return <Navigate to="/login" replace />;
+  if (!token || !user) return <Navigate to="/login" replace />;
   
-  const user = JSON.parse(userStr);
   if (user.role === 'doctor') {
       return <Navigate to="/doctor" replace />;
   }
@@ -62,11 +70,10 @@ const AssessmentRoute = ({ children }) => {
 
 const IntakeRoute = ({ children }) => {
   const token = localStorage.getItem('serene_token');
-  const userStr = localStorage.getItem('serene_user');
+  const user = parseUser();
 
-  if (!token || !userStr) return <Navigate to="/login" replace />;
+  if (!token || !user) return <Navigate to="/login" replace />;
 
-  const user = JSON.parse(userStr);
   if (user.role === 'doctor') {
       return <Navigate to="/doctor" replace />;
   }
@@ -79,11 +86,10 @@ const IntakeRoute = ({ children }) => {
 // Route wrapper for doctor access
 const DoctorRoute = ({ children }) => {
   const token = localStorage.getItem('serene_token');
-  const userStr = localStorage.getItem('serene_user');
+  const user = parseUser();
   
-  if (!token || !userStr) return <Navigate to="/login" replace />;
+  if (!token || !user) return <Navigate to="/login" replace />;
   
-  const user = JSON.parse(userStr);
   if (user.role !== 'doctor') {
       return <Navigate to="/dashboard" replace />;
   }
@@ -165,6 +171,15 @@ function App() {
 
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />
+
+        {/* 404 Catch-all */}
+        <Route path="*" element={
+          <div className="flex flex-col items-center justify-center h-screen bg-[#E8E8E8] text-[#0D1B2A]">
+            <h1 className="text-6xl font-bold mb-4">404</h1>
+            <p className="text-xl mb-8">Page not found</p>
+            <a href="/" className="px-6 py-3 bg-[#0E7C7B] text-white rounded-xl hover:bg-[#0C6B6A] transition">Go Home</a>
+          </div>
+        } />
       </Routes>
     </BrowserRouter>
   );

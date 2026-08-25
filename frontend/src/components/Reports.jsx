@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, ArrowLeft, Filter, Download, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { API_BASE } from '../apiConfig';
 
 const Reports = () => {
     const [reports, setReports] = useState([]);
@@ -10,7 +11,7 @@ const Reports = () => {
         const fetchReports = async () => {
              try {
                  const token = localStorage.getItem('serene_token');
-                 const response = await fetch('http://localhost:5000/api/dashboard/reports', {
+                 const response = await fetch(`${API_BASE}/api/dashboard/reports`, {
                      headers: { 'Authorization': `Bearer ${token}` }
                  });
                  if (response.ok) {

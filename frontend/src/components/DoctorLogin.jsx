@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authConstraints, validateLoginForm, validateRegisterForm } from '../utils/authValidation';
+import { authConstraints, validateUsername, validateEmail, validateFullName } from '../utils/authValidation';
+import { API_BASE } from '../apiConfig';
 
 const styles = {
   page: {
@@ -306,22 +307,94 @@ const DoctorLogin = () => {
     specialization: '',
     licenseNumber: '',
   });
-  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const update = (key, val) => setFormData(prev => ({ ...prev, [key]: val }));
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'fullName':
+        return validateFullName(value);
+      case 'username':
+        return validateUsername(value, 'Username');
+      case 'email':
+        return validateEmail(value);
+      case 'identifier': {
+        const id = value.trim();
+        if (!id) return 'Enter your username or email';
+        if (id.length < 3) return 'Must be at least 3 characters';
+        if (id.length > 254) return 'Must be 254 characters or fewer';
+        return '';
+      }
+      case 'password': {
+        if (!value) return 'Password is required';
+        if (value.length > 64) return 'Must be 64 characters or fewer';
+        if (isRegister) {
+          if (value.length < 8) return 'Must be at least 8 characters';
+          if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) {
+            return 'Needs uppercase, lowercase, and a number';
+          }
+        }
+        return '';
+      }
+      case 'confirmPassword': {
+        if (!value) return 'Please confirm your password';
+        if (value !== formData.password) return 'Passwords do not match';
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    const error = validateField(name, value);
+    setFieldErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setServerError('');
+    if (touched[name]) {
+      const error = validateField(name, value);
+      setFieldErrors(prev => ({ ...prev, [name]: error }));
+    }
+  };
+
+  const getFieldBorderColor = (name) => {
+    if (fieldErrors[name]) return 'rgba(239,68,68,0.6)';
+    if (touched[name] && !fieldErrors[name] && formData[name]) return 'rgba(34,197,94,0.5)';
+    return 'rgba(255,255,255,0.12)';
+  };
+
+  const getFieldBg = (name) => {
+    if (fieldErrors[name]) return 'rgba(239,68,68,0.08)';
+    return 'rgba(255,255,255,0.05)';
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    const validationError = isRegister
-      ? validateRegisterForm(formData, { isDoctor: true })
-      : validateLoginForm(formData);
+    setServerError('');
 
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    const allTouched = {};
+    const allErrors = {};
+    const fields = isRegister
+      ? ['fullName', 'username', 'email', 'password', 'confirmPassword']
+      : ['identifier', 'password'];
+
+    fields.forEach(name => {
+      allTouched[name] = true;
+      allErrors[name] = validateField(name, formData[name]);
+    });
+    setTouched(allTouched);
+    setFieldErrors(allErrors);
+
+    const hasErrors = Object.values(allErrors).some(err => err);
+    if (hasErrors) return;
 
     setLoading(true);
     const endpoint = isRegister ? '/api/auth/doctor/register' : '/api/auth/doctor/login';
@@ -340,7 +413,7 @@ const DoctorLogin = () => {
           password: formData.password,
         };
     try {
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -351,11 +424,27 @@ const DoctorLogin = () => {
       localStorage.setItem('serene_user', JSON.stringify(data.user));
       navigate('/doctor');
     } catch (err) {
-      setError(err.message);
+      setServerError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const switchMode = () => {
+    setIsRegister(!isRegister);
+    setFieldErrors({});
+    setTouched({});
+    setServerError('');
+    setFormData({
+      fullName: '', username: '', email: '', identifier: '',
+      password: '', confirmPassword: '', specialization: '', licenseNumber: '',
+    });
+  };
+
+  const fieldErrorStyle = (name) => ({
+    background: getFieldBg(name),
+    borderColor: getFieldBorderColor(name),
+  });
 
   return (
     <div style={styles.page}>
@@ -400,25 +489,30 @@ const DoctorLogin = () => {
           <div style={styles.tabRow}>
             <button
               type="button"
-              onClick={() => { setIsRegister(false); setError(''); }}
+              onClick={switchMode}
               style={{ ...styles.tab, ...(!isRegister ? styles.tabActive : {}) }}
             >
               Sign In
             </button>
             <button
               type="button"
-              onClick={() => { setIsRegister(true); setError(''); }}
+              onClick={switchMode}
               style={{ ...styles.tab, ...(isRegister ? styles.tabActive : {}) }}
             >
               Register
             </button>
           </div>
 
-          {/* Error */}
-          {error && <div style={styles.error}>{error}</div>}
+          {/* Server Error */}
+          {serverError && (
+            <div style={{ ...styles.error, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', fontSize: '13px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+              {serverError}
+            </div>
+          )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} style={styles.form}>
+          <form onSubmit={handleSubmit} style={styles.form} noValidate>
 
             {isRegister && (
               <div style={styles.field}>
@@ -429,14 +523,20 @@ const DoctorLogin = () => {
                   </span>
                   <input
                     type="text"
+                    name="fullName"
                     required
                     placeholder="Dr. Jane Smith"
                     className="doc-input"
-                    style={styles.input}
+                    style={{ ...styles.input, ...fieldErrorStyle('fullName') }}
                     value={formData.fullName}
-                    onChange={e => update('fullName', e.target.value)}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
                   />
                 </div>
+                {fieldErrors.fullName && <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {fieldErrors.fullName}
+                </div>}
               </div>
             )}
 
@@ -449,6 +549,7 @@ const DoctorLogin = () => {
                   </span>
                   <input
                     type="text"
+                    name="username"
                     required
                     minLength={3}
                     maxLength={24}
@@ -456,12 +557,20 @@ const DoctorLogin = () => {
                     autoComplete="username"
                     placeholder="dr_smith"
                     className="doc-input"
-                    style={styles.input}
+                    style={{ ...styles.input, ...fieldErrorStyle('username') }}
                     value={formData.username}
-                    onChange={e => update('username', e.target.value)}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
                   />
                 </div>
-                <div style={styles.helperText}>{authConstraints.username}</div>
+                {fieldErrors.username ? (
+                  <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    {fieldErrors.username}
+                  </div>
+                ) : (
+                  <div style={styles.helperText}>{authConstraints.username}</div>
+                )}
               </div>
             )}
 
@@ -474,16 +583,22 @@ const DoctorLogin = () => {
                   </span>
                   <input
                     type="email"
+                    name="email"
                     required
                     maxLength={254}
                     autoComplete="email"
                     placeholder="doctor@hospital.com"
                     className="doc-input"
-                    style={styles.input}
+                    style={{ ...styles.input, ...fieldErrorStyle('email') }}
                     value={formData.email}
-                    onChange={e => update('email', e.target.value)}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
                   />
                 </div>
+                {fieldErrors.email && <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {fieldErrors.email}
+                </div>}
               </div>
             ) : (
               <div style={styles.field}>
@@ -494,17 +609,23 @@ const DoctorLogin = () => {
                   </span>
                   <input
                     type="text"
+                    name="identifier"
                     required
                     minLength={3}
                     maxLength={254}
                     autoComplete="username"
                     placeholder="Username or email"
                     className="doc-input"
-                    style={styles.input}
+                    style={{ ...styles.input, ...fieldErrorStyle('identifier') }}
                     value={formData.identifier}
-                    onChange={e => update('identifier', e.target.value)}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
                   />
                 </div>
+                {fieldErrors.identifier && <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {fieldErrors.identifier}
+                </div>}
               </div>
             )}
 
@@ -516,18 +637,27 @@ const DoctorLogin = () => {
                 </span>
                 <input
                   type="password"
+                  name="password"
                   required
                   minLength={8}
                   maxLength={64}
                   autoComplete={isRegister ? 'new-password' : 'current-password'}
                   placeholder="••••••••"
                   className="doc-input"
-                  style={styles.input}
+                  style={{ ...styles.input, ...fieldErrorStyle('password') }}
                   value={formData.password}
-                  onChange={e => update('password', e.target.value)}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
                 />
               </div>
-              {isRegister && <div style={styles.helperText}>{authConstraints.password}</div>}
+              {fieldErrors.password ? (
+                <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {fieldErrors.password}
+                </div>
+              ) : isRegister ? (
+                <div style={styles.helperText}>{authConstraints.password}</div>
+              ) : null}
             </div>
 
             {isRegister && (
@@ -540,17 +670,23 @@ const DoctorLogin = () => {
                     </span>
                     <input
                       type="password"
+                      name="confirmPassword"
                       required
                       minLength={8}
                       maxLength={64}
                       autoComplete="new-password"
                       placeholder="Re-enter password"
                       className="doc-input"
-                      style={styles.input}
+                      style={{ ...styles.input, ...fieldErrorStyle('confirmPassword') }}
                       value={formData.confirmPassword}
-                      onChange={e => update('confirmPassword', e.target.value)}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
                     />
                   </div>
+                  {fieldErrors.confirmPassword && <div style={{ color: '#fca5a5', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    {fieldErrors.confirmPassword}
+                  </div>}
                 </div>
 
                 <div style={styles.field}>
@@ -561,12 +697,13 @@ const DoctorLogin = () => {
                     </span>
                     <input
                       type="text"
+                      name="specialization"
                       maxLength={80}
                       placeholder="e.g. Psychiatry, Psychology"
                       className="doc-input"
                       style={styles.input}
                       value={formData.specialization}
-                      onChange={e => update('specialization', e.target.value)}
+                      onChange={handleChange}
                     />
                   </div>
                 </div>
@@ -579,12 +716,13 @@ const DoctorLogin = () => {
                     </span>
                     <input
                       type="text"
+                      name="licenseNumber"
                       maxLength={40}
                       placeholder="Medical license ID"
                       className="doc-input"
                       style={styles.input}
                       value={formData.licenseNumber}
-                      onChange={e => update('licenseNumber', e.target.value)}
+                      onChange={handleChange}
                     />
                   </div>
                 </div>
@@ -609,7 +747,7 @@ const DoctorLogin = () => {
             {isRegister ? 'Already registered?' : "Don't have an account?"}
             <button
               type="button"
-              onClick={() => { setIsRegister(!isRegister); setError(''); }}
+              onClick={switchMode}
               style={styles.toggleBtn}
             >
               {isRegister ? 'Sign In' : 'Register'}

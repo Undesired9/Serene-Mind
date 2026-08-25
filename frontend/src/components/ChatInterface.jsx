@@ -6,8 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import SereneBlob from './SereneBlob';
 import BookingModal from './BookingModal';
 import GroundingModal from './GroundingModal';
-
-const API_BASE = 'http://localhost:5000';
+import { API_BASE } from '../apiConfig';
 
 const createWelcomeMessage = () => ({
     id: Date.now(),
@@ -39,6 +38,12 @@ const ChatInterface = () => {
     const endOfMessagesRef = useRef(null);
     const recognitionRef = useRef(null);
     const isVoiceLockedRef = useRef(false); // Synchronous lock to prevent double firing
+    const messagesRef = useRef(messages); // Ref to access latest messages in async callbacks
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     // Fetch escalation status
     const fetchEscalationStatus = useCallback(async () => {
@@ -54,6 +59,9 @@ const ChatInterface = () => {
                 setEscalationStatus(data);
                 if (data.is_chat_locked) {
                     setShowBookingModal(true);
+                } else {
+                    // Reset crisis flag when chat is unlocked
+                    setIsCrisis(false);
                 }
             }
         } catch (error) {
@@ -232,20 +240,21 @@ const ChatInterface = () => {
         if (!input.trim() || isCrisis || escalationStatus?.is_chat_locked) return;
 
         const userMsg = { id: Date.now(), text: input, sender: 'user', timestamp: new Date() };
+        const currentInput = input;
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setIsTyping(true);
 
         try {
             const token = localStorage.getItem('serene_token');
-            const historyForApi = messages.filter(msg => !msg.isPlaceholder);
+            const historyForApi = messagesRef.current.filter(msg => !msg.isPlaceholder);
             const response = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ message: input, history: historyForApi, sessionId: activeSessionId })
+                body: JSON.stringify({ message: currentInput, history: historyForApi, sessionId: activeSessionId })
             });
             const data = await response.json();
             
@@ -260,6 +269,10 @@ const ChatInterface = () => {
                 setEscalationStatus(data.escalationStatus);
                 if (data.escalationStatus.is_chat_locked) {
                     setShowBookingModal(true);
+                }
+                // Reset crisis flag if chat is now unlocked (e.g., after booking appointment)
+                if (!data.escalationStatus.is_chat_locked) {
+                    setIsCrisis(false);
                 }
             }
 
@@ -469,11 +482,7 @@ const ChatInterface = () => {
             {/* Booking Modal */}
             <BookingModal 
                 isOpen={showBookingModal} 
-                onClose={() => {
-                    if (!escalationStatus?.is_chat_locked) {
-                        setShowBookingModal(false);
-                    }
-                }}
+                onClose={() => setShowBookingModal(false)}
                 onBooked={handleBookingSuccess}
             />
             

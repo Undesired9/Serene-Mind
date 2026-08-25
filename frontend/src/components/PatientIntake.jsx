@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck } from 'lucide-react';
+import { API_BASE } from '../apiConfig';
 
 const NAME_PATTERN = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
 const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
@@ -275,7 +276,7 @@ const PatientIntake = () => {
         const loadExistingIntake = async () => {
             try {
                 const token = localStorage.getItem('serene_token');
-                const response = await fetch('http://localhost:5000/api/auth/intake', {
+                const response = await fetch(`${API_BASE}/api/auth/intake`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await response.json();
@@ -382,7 +383,7 @@ const PatientIntake = () => {
 
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/auth/intake', {
+            const response = await fetch(`${API_BASE}/api/auth/intake`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

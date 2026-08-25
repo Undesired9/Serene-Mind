@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, ClipboardList, Clock, FileText, Heart, MessageSquare, Search, ShieldCheck, Users, X } from 'lucide-react';
 import DoctorAvailability from './DoctorAvailability';
-
-const API_BASE = 'http://localhost:5000';
+import { API_BASE } from '../apiConfig';
 
 const formatDate = (value) => new Date(value).toLocaleDateString();
 const formatDateTime = (value) => new Date(value).toLocaleString();

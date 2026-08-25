@@ -1,26 +1,102 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { authConstraints, validateLoginForm, validateRegisterForm } from '../utils/authValidation';
+import { authConstraints, validateUsername, validateEmail } from '../utils/authValidation';
+import { API_BASE } from '../apiConfig';
+
+const fieldErrorClass = 'border-red-400 focus:ring-red-400/30';
+const fieldValidClass = 'border-emerald-400 focus:ring-emerald-400/30';
+const fieldDefaultClass = 'border-[#0E7C7B]/20 focus:ring-[#1B98E0]';
 
 const Login = () => {
     const navigate = useNavigate();
     const [isRegister, setIsRegister] = useState(false);
     const [formData, setFormData] = useState({ username: '', email: '', identifier: '', password: '', confirmPassword: '' });
-    const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [touched, setTouched] = useState({});
+    const [serverError, setServerError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const validateField = (name, value) => {
+        if (!value && !touched[name]) return '';
+        switch (name) {
+            case 'username':
+                return validateUsername(value, 'Username');
+            case 'email':
+                return validateEmail(value);
+            case 'identifier': {
+                const id = value.trim();
+                if (!id) return 'Enter your username or email';
+                if (id.length < 3) return 'Must be at least 3 characters';
+                if (id.length > 254) return 'Must be 254 characters or fewer';
+                return '';
+            }
+            case 'password': {
+                if (!value) return 'Password is required';
+                if (value.length > 64) return 'Must be 64 characters or fewer';
+                if (isRegister) {
+                    if (value.length < 8) return 'Must be at least 8 characters';
+                    if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) {
+                        return 'Needs uppercase, lowercase, and a number';
+                    }
+                }
+                return '';
+            }
+            case 'confirmPassword': {
+                if (!value) return 'Please confirm your password';
+                if (value !== formData.password) return 'Passwords do not match';
+                return '';
+            }
+            default:
+                return '';
+        }
+    };
+
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        setTouched(prev => ({ ...prev, [name]: true }));
+        const error = validateField(name, value);
+        setFieldErrors(prev => ({ ...prev, [name]: error }));
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        setServerError('');
+        // Re-validate if field was already touched
+        if (touched[name]) {
+            const error = validateField(name, value);
+            setFieldErrors(prev => ({ ...prev, [name]: error }));
+        }
+    };
+
+    const getFieldState = (name) => {
+        if (fieldErrors[name]) return fieldErrorClass;
+        if (touched[name] && !fieldErrors[name] && formData[name]) return fieldValidClass;
+        return fieldDefaultClass;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        const validationError = isRegister
-            ? validateRegisterForm(formData)
-            : validateLoginForm(formData);
+        setServerError('');
 
-        if (validationError) {
-            setError(validationError);
-            return;
-        }
+        // Validate all fields on submit
+        const allTouched = {};
+        const allErrors = {};
+        const fields = isRegister
+            ? ['username', 'email', 'password', 'confirmPassword']
+            : ['identifier', 'password'];
+
+        fields.forEach(name => {
+            allTouched[name] = true;
+            allErrors[name] = validateField(name, formData[name]);
+        });
+        setTouched(allTouched);
+        setFieldErrors(allErrors);
+
+        // Check if there are any errors
+        const hasErrors = Object.values(allErrors).some(err => err);
+        if (hasErrors) return;
 
         setLoading(true);
 
@@ -38,7 +114,7 @@ const Login = () => {
             };
 
         try {
-            const response = await fetch(`http://localhost:5000${endpoint}`, {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -55,10 +131,18 @@ const Login = () => {
 
             navigate('/dashboard');
         } catch (err) {
-            setError(err.message);
+            setServerError(err.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    const switchMode = () => {
+        setIsRegister(!isRegister);
+        setFieldErrors({});
+        setTouched({});
+        setServerError('');
+        setFormData({ username: '', email: '', identifier: '', password: '', confirmPassword: '' });
     };
 
     return (
@@ -77,29 +161,41 @@ const Login = () => {
                     <p className="text-[#3D5A80] text-sm text-center">Your private, AI-powered space for mental clarity and peace.</p>
                 </div>
 
-                {error && (
-                    <div className="bg-red-900/30 border border-red-500/50 text-red-200 p-3 rounded-xl mb-6 text-sm text-center">
-                        {error}
+                {serverError && (
+                    <div className="bg-red-50 border border-red-300 text-red-700 p-3 rounded-xl mb-6 text-sm text-center flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        {serverError}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                     {isRegister && (
                         <div>
                             <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Username</label>
                             <input
                                 type="text"
+                                name="username"
                                 required
                                 minLength={3}
                                 maxLength={24}
                                 pattern="[A-Za-z0-9._-]+"
                                 autoComplete="username"
                                 placeholder="mindful_user"
-                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                className={`w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 border transition ${getFieldState('username')}`}
                                 value={formData.username}
-                                onChange={e => setFormData({ ...formData, username: e.target.value })}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                             />
-                            <p className="text-xs text-[#3D5A80] mt-1">{authConstraints.username}</p>
+                            {fieldErrors.username ? (
+                                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                    {fieldErrors.username}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-[#3D5A80]/70 mt-1">{authConstraints.username}</p>
+                            )}
                         </div>
                     )}
                     {isRegister ? (
@@ -107,60 +203,93 @@ const Login = () => {
                             <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Email</label>
                             <input
                                 type="email"
+                                name="email"
                                 required
                                 maxLength={254}
                                 autoComplete="email"
                                 placeholder="you@example.com"
-                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                className={`w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 border transition ${getFieldState('email')}`}
                                 value={formData.email}
-                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                             />
+                            {fieldErrors.email && (
+                                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                    {fieldErrors.email}
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <div>
                             <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Username or email</label>
                             <input
                                 type="text"
+                                name="identifier"
                                 required
                                 minLength={3}
                                 maxLength={254}
                                 autoComplete="username"
                                 placeholder="Username or email"
-                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                className={`w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 border transition ${getFieldState('identifier')}`}
                                 value={formData.identifier}
-                                onChange={e => setFormData({ ...formData, identifier: e.target.value })}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                             />
+                            {fieldErrors.identifier && (
+                                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                    {fieldErrors.identifier}
+                                </p>
+                            )}
                         </div>
                     )}
                     <div>
                         <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Password</label>
                         <input
                             type="password"
+                            name="password"
                             required
-                            minLength={8}
+                            minLength={isRegister ? 8 : 1}
                             maxLength={64}
                             autoComplete={isRegister ? 'new-password' : 'current-password'}
                             placeholder={isRegister ? 'Create a strong password' : 'Enter your password'}
-                            className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                            className={`w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 border transition ${getFieldState('password')}`}
                             value={formData.password}
-                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
                         />
-                        {isRegister && <p className="text-xs text-[#3D5A80] mt-1">{authConstraints.password}</p>}
+                        {fieldErrors.password ? (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                {fieldErrors.password}
+                            </p>
+                        ) : isRegister ? (
+                            <p className="text-xs text-[#3D5A80]/70 mt-1">{authConstraints.password}</p>
+                        ) : null}
                     </div>
                     {isRegister && (
                         <div>
                             <label className="block text-[#3D5A80] text-xs font-semibold mb-1 uppercase tracking-wider">Confirm password</label>
                             <input
                                 type="password"
+                                name="confirmPassword"
                                 required
                                 minLength={8}
                                 maxLength={64}
                                 autoComplete="new-password"
                                 placeholder="Re-enter your password"
-                                className="w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border border-[#0E7C7B]/20 transition"
+                                className={`w-full bg-white/80 text-[#0D1B2A] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 border transition ${getFieldState('confirmPassword')}`}
                                 value={formData.confirmPassword}
-                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                             />
+                            {fieldErrors.confirmPassword && (
+                                <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                    {fieldErrors.confirmPassword}
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -176,7 +305,7 @@ const Login = () => {
                 <div className="mt-8 text-center text-sm text-[#3D5A80]">
                     {isRegister ? 'Already have an account?' : "Don't have an account?"}
                     <button
-                        onClick={() => setIsRegister(!isRegister)}
+                        onClick={switchMode}
                         className="ml-2 font-bold text-[#0E7C7B] hover:text-[#0A5E5D] hover:underline transition-colors"
                     >
                         {isRegister ? 'Log In' : 'Sign Up'}

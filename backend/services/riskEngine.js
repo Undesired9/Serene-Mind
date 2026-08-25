@@ -73,9 +73,9 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
 
     if (recentMoods.length >= 3) {
         const avgMood = recentMoods.reduce((a, b) => a + b.mood_score, 0) / recentMoods.length;
-        if (avgMood <= 1.8) {
+        if (avgMood <= 3.6) {
             score += 20;
-            triggeredSignals.push({ type: 'LONGITUDINAL_MOOD_DECLINE', signal: `Consistently low mood trajectory (Avg: ${avgMood.toFixed(1)}/5)` });
+            triggeredSignals.push({ type: 'LONGITUDINAL_MOOD_DECLINE', signal: `Consistently low mood trajectory (Avg: ${avgMood.toFixed(1)}/10)` });
         }
     }
 

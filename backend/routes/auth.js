@@ -7,7 +7,7 @@ const { verifyToken } = require('../middleware/auth');
 const { logAuditEvent } = require('../services/auditLogger');
 const { evaluateMultiSignalRisk } = require('../services/riskEngine');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_serenemind_key_change_in_prod';
+const { JWT_SECRET } = require('../config');
 
 const getRow = (sql, params = []) => new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
@@ -481,7 +481,7 @@ router.post('/doctor/register', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        logAuditEvent('LOGIN', result.lastID, result.lastID, 'CLINICIAN', { action: 'Doctor registered' });
+        logAuditEvent('DOCTOR_REGISTERED', result.lastID, result.lastID, 'CLINICIAN', { action: 'Doctor registered' });
 
         res.status(201).json({
             message: 'Doctor account created successfully',

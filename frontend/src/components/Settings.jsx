@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Settings as SettingsIcon, Trash2, ArrowLeft, Shield, AlertOctagon, Globe } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { API_BASE } from '../apiConfig';
 
 const Settings = () => {
     const { t, i18n } = useTranslation();
@@ -19,7 +20,7 @@ const Settings = () => {
         setIsClearing(true);
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/chat/history', {
+            const response = await fetch(`${API_BASE}/api/chat/history`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -49,7 +50,7 @@ const Settings = () => {
         setIsDeleting(true);
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/auth/account', {
+            const response = await fetch(`${API_BASE}/api/auth/account`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

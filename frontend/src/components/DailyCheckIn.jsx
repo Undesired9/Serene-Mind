@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Smile, Meh, Frown, CheckCircle } from 'lucide-react';
+import { API_BASE } from '../apiConfig';
 
 const DailyCheckIn = ({ onMoodLogged }) => {
     const [mood, setMood] = useState(null); // 1-10 string mapped roughly from emoticons
@@ -17,7 +18,7 @@ const DailyCheckIn = ({ onMoodLogged }) => {
 
         try {
             const token = localStorage.getItem('serene_token');
-            const response = await fetch('http://localhost:5000/api/dashboard/mood', {
+            const response = await fetch(`${API_BASE}/api/dashboard/mood`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

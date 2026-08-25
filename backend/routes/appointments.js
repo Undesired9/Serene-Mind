@@ -46,6 +46,18 @@ router.get('/doctors', verifyToken, async (req, res) => {
     }
 });
 
+// GET: Get doctor availability slots
+router.get('/doctors/:doctorId/availability', verifyToken, async (req, res) => {
+    const { doctorId } = req.params;
+    try {
+        const slots = generateSampleAvailability(doctorId);
+        res.json(slots);
+    } catch (err) {
+        console.error('Failed to get availability:', err);
+        res.status(500).json({ error: 'Failed to get availability' });
+    }
+});
+
 // GET: Alias for mobile consistency
 router.get('/', verifyToken, async (req, res) => {
     const userId = req.user.id;
@@ -224,10 +236,11 @@ router.put('/:appointmentId/status', verifyToken, requireDoctor, async (req, res
     try {
         await new Promise((resolve, reject) => {
             db.run(
-                `UPDATE Appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-                [status, appointmentId],
+                `UPDATE Appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?`,
+                [status, appointmentId, req.user.id],
                 function(err) {
                     if (err) return reject(err);
+                    if (this.changes === 0) return reject(new Error('Appointment not found or access denied'));
                     resolve();
                 }
             );
