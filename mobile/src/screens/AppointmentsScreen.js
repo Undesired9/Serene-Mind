@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, Alert, Modal, TextInput, ScrollView } from 'react-native';
 import { api } from '../services/api';
+
 
 export default function AppointmentsScreen() {
     const [doctors, setDoctors] = useState([]);
@@ -97,21 +98,25 @@ export default function AppointmentsScreen() {
                         )}
                     </View>
                 }
-                renderItem={({ item }) => (
-                    <View style={styles.apptCard}>
-                        <View style={styles.apptHeader}>
-                            <Text style={styles.apptDocName}>Dr. {item.doctor_name}</Text>
-                            <View style={[
-                                styles.statusBadge,
-                                item.status === 'confirmed' ? styles.statusConfirmed : styles.statusPending
-                            ]}>
-                                <Text style={styles.statusText}>{item.status}</Text>
+                renderItem={({ item }) => {
+                    const isScheduled = item.status === 'SCHEDULED' || item.status === 'confirmed';
+                    const apptTime = item.appointment_datetime || item.appointment_date;
+                    return (
+                        <View style={styles.apptCard}>
+                            <View style={styles.apptHeader}>
+                                <Text style={styles.apptDocName}>Dr. {item.doctor_name || 'Clinician'}</Text>
+                                <View style={[
+                                    styles.statusBadge,
+                                    isScheduled ? styles.statusConfirmed : styles.statusPending
+                                ]}>
+                                    <Text style={styles.statusText}>{item.status || 'SCHEDULED'}</Text>
+                                </View>
                             </View>
+                            <Text style={styles.apptDate}>📅 {apptTime ? new Date(apptTime).toLocaleString() : 'Date not specified'}</Text>
+                            {item.notes ? <Text style={styles.apptNotes}>Note: {item.notes}</Text> : null}
                         </View>
-                        <Text style={styles.apptDate}>📅 {new Date(item.appointment_date).toLocaleString()}</Text>
-                        {item.notes ? <Text style={styles.apptNotes}>Note: {item.notes}</Text> : null}
-                    </View>
-                )}
+                    );
+                }}
             />
 
             {/* Booking Modal */}
