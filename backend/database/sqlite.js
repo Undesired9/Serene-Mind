@@ -1,4 +1,5 @@
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
@@ -50,58 +51,97 @@ function sanitizeRow(row) {
     return clean;
 }
 
+// Global initialization promise to prevent cold-start race conditions
+let initPromise = null;
+
 // Compatibility wrapper matching sqlite3 Database API
 const db = {
     client,
     isTurso: Boolean(tursoUrl),
 
+    async ready() {
+        if (initPromise) await initPromise;
+    },
+
     run(sql, params, callback) {
         const { sql: querySql, params: queryParams, callback: cb } = normalizeArgs(sql, params, callback);
-        client.execute({ sql: querySql, args: queryParams })
-            .then(result => {
-                const context = {
-                    lastID: result.lastInsertRowid ? Number(result.lastInsertRowid) : 0,
-                    changes: result.rowsAffected || 0
-                };
-                cb.call(context, null);
-            })
-            .catch(err => {
-                cb.call({ lastID: 0, changes: 0 }, err);
-            });
+        const executeQuery = () => {
+            client.execute({ sql: querySql, args: queryParams })
+                .then(result => {
+                    const context = {
+                        lastID: result.lastInsertRowid ? Number(result.lastInsertRowid) : 0,
+                        changes: result.rowsAffected || 0
+                    };
+                    cb.call(context, null);
+                })
+                .catch(err => {
+                    cb.call({ lastID: 0, changes: 0 }, err);
+                });
+        };
+
+        if (initPromise) {
+            initPromise.then(executeQuery).catch(executeQuery);
+        } else {
+            executeQuery();
+        }
         return this;
     },
 
     get(sql, params, callback) {
         const { sql: querySql, params: queryParams, callback: cb } = normalizeArgs(sql, params, callback);
-        client.execute({ sql: querySql, args: queryParams })
-            .then(result => {
-                const row = result.rows && result.rows.length > 0 ? sanitizeRow(result.rows[0]) : null;
-                cb(null, row);
-            })
-            .catch(err => {
-                cb(err, null);
-            });
+        const executeQuery = () => {
+            client.execute({ sql: querySql, args: queryParams })
+                .then(result => {
+                    const row = result.rows && result.rows.length > 0 ? sanitizeRow(result.rows[0]) : null;
+                    cb(null, row);
+                })
+                .catch(err => {
+                    cb(err, null);
+                });
+        };
+
+        if (initPromise) {
+            initPromise.then(executeQuery).catch(executeQuery);
+        } else {
+            executeQuery();
+        }
         return this;
     },
 
     all(sql, params, callback) {
         const { sql: querySql, params: queryParams, callback: cb } = normalizeArgs(sql, params, callback);
-        client.execute({ sql: querySql, args: queryParams })
-            .then(result => {
-                const rows = (result.rows || []).map(sanitizeRow);
-                cb(null, rows);
-            })
-            .catch(err => {
-                cb(err, null);
-            });
+        const executeQuery = () => {
+            client.execute({ sql: querySql, args: queryParams })
+                .then(result => {
+                    const rows = (result.rows || []).map(sanitizeRow);
+                    cb(null, rows);
+                })
+                .catch(err => {
+                    cb(err, null);
+                });
+        };
+
+        if (initPromise) {
+            initPromise.then(executeQuery).catch(executeQuery);
+        } else {
+            executeQuery();
+        }
         return this;
     },
 
     exec(sql, callback) {
         const cb = callback || (() => {});
-        client.executeMultiple(sql)
-            .then(() => cb(null))
-            .catch(err => cb(err));
+        const executeQuery = () => {
+            client.executeMultiple(sql)
+                .then(() => cb(null))
+                .catch(err => cb(err));
+        };
+
+        if (initPromise) {
+            initPromise.then(executeQuery).catch(executeQuery);
+        } else {
+            executeQuery();
+        }
         return this;
     },
 
@@ -114,20 +154,24 @@ const db = {
 
     // Modern Promise-based utilities
     async execute(sql, args = []) {
+        if (initPromise) await initPromise;
         return client.execute({ sql, args });
     },
 
     async queryGet(sql, args = []) {
+        if (initPromise) await initPromise;
         const res = await client.execute({ sql, args });
         return res.rows && res.rows.length > 0 ? sanitizeRow(res.rows[0]) : null;
     },
 
     async queryAll(sql, args = []) {
+        if (initPromise) await initPromise;
         const res = await client.execute({ sql, args });
         return (res.rows || []).map(sanitizeRow);
     },
 
     async queryRun(sql, args = []) {
+        if (initPromise) await initPromise;
         const res = await client.execute({ sql, args });
         return {
             lastID: res.lastInsertRowid ? Number(res.lastInsertRowid) : 0,
@@ -390,18 +434,77 @@ const schemaStatements = [
     `CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON Audit_Logs(user_id)`
 ];
 
+async function seedDefaultDoctors() {
+    try {
+        const countRes = await client.execute("SELECT COUNT(*) as count FROM Doctors");
+        const count = countRes.rows && countRes.rows.length > 0 ? Number(countRes.rows[0].count || 0) : 0;
+        
+        if (count === 0) {
+            console.log('🌱 Seeding default clinicians into database...');
+            const defaultPasswordHash = bcrypt.hashSync('Password123!', 10);
+
+            const doctors = [
+                {
+                    username: 'dr.mitchell',
+                    full_name: 'Dr. Sarah Mitchell, MD',
+                    email: 'dr.mitchell@serenemind.org',
+                    password_hash: defaultPasswordHash,
+                    specialization: 'Clinical Psychologist & CBT Specialist',
+                    license_number: 'PSY-89241-CA'
+                },
+                {
+                    username: 'dr.wilson',
+                    full_name: 'Dr. James Wilson, MD',
+                    email: 'dr.wilson@serenemind.org',
+                    password_hash: defaultPasswordHash,
+                    specialization: 'Adult Psychiatry & Mood Disorders',
+                    license_number: 'MED-77149-NY'
+                },
+                {
+                    username: 'dr.vance',
+                    full_name: 'Dr. Emily Vance, PsyD',
+                    email: 'dr.vance@serenemind.org',
+                    password_hash: defaultPasswordHash,
+                    specialization: 'Trauma & Mindfulness-Based Therapy',
+                    license_number: 'PSY-63201-TX'
+                },
+                {
+                    username: 'dr.kim',
+                    full_name: 'Dr. David Kim, MD',
+                    email: 'dr.kim@serenemind.org',
+                    password_hash: defaultPasswordHash,
+                    specialization: 'Anxiety & Stress Management',
+                    license_number: 'PSY-51203-IL'
+                }
+            ];
+
+            for (const doc of doctors) {
+                await client.execute({
+                    sql: `INSERT OR IGNORE INTO Doctors (username, full_name, email, password_hash, specialization, license_number) 
+                          VALUES (?, ?, ?, ?, ?, ?)`,
+                    args: [doc.username, doc.full_name, doc.email, doc.password_hash, doc.specialization, doc.license_number]
+                });
+            }
+            console.log('✅ Default clinicians seeded successfully.');
+        }
+    } catch (err) {
+        console.warn('⚠️ Clinician seeding note:', err.message);
+    }
+}
+
 async function initializeDatabase() {
     try {
         for (const stmt of schemaStatements) {
             await client.execute(stmt);
         }
+        await seedDefaultDoctors();
         console.log('✅ SereneMind SQLite/Turso database schema initialized successfully.');
     } catch (err) {
         console.error('⚠️ Database schema initialization notice:', err.message);
     }
 }
 
-// Trigger schema setup
-initializeDatabase();
+// Trigger schema setup with initPromise for race condition prevention
+initPromise = initializeDatabase();
 
 module.exports = db;
