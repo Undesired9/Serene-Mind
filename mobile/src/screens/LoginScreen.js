@@ -5,27 +5,46 @@ import { api } from '../services/api';
 
 export default function LoginScreen({ navigation, onLoginSuccess }) {
     const [isRegister, setIsRegister] = useState(false);
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [age, setAge] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
-        if (!email || !password || (isRegister && !fullName)) {
-            Alert.alert('Required Fields', 'Please fill in all required fields.');
-            return;
+        if (isRegister) {
+            if (!username.trim() || !email.trim() || !password || !confirmPassword) {
+                Alert.alert('Required Fields', 'Please complete all required fields.');
+                return;
+            }
+            if (password !== confirmPassword) {
+                Alert.alert('Password Mismatch', 'Passwords do not match.');
+                return;
+            }
+        } else {
+            if (!email.trim() || !password) {
+                Alert.alert('Required Fields', 'Please enter your username/email and password.');
+                return;
+            }
         }
 
         setLoading(true);
         try {
             if (isRegister) {
-                const data = await api.register({ email, password, full_name: fullName, age: age ? parseInt(age) : null });
+                const data = await api.register({
+                    username: username.trim(),
+                    email: email.trim(),
+                    password,
+                    confirmPassword
+                });
                 await AsyncStorage.setItem('serene_token', data.token);
                 await AsyncStorage.setItem('serene_user', JSON.stringify(data.user));
                 onLoginSuccess(data.user);
             } else {
-                const data = await api.login({ email, password });
+                const data = await api.login({
+                    identifier: email.trim(),
+                    password
+                });
                 await AsyncStorage.setItem('serene_token', data.token);
                 await AsyncStorage.setItem('serene_user', JSON.stringify(data.user));
                 onLoginSuccess(data.user);
@@ -50,33 +69,25 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
                     </View>
 
                     <View style={styles.card}>
-                        <Text style={styles.cardTitle}>{isRegister ? 'Create Account' : 'Welcome Back'}</Text>
+                        <Text style={styles.cardTitle}>{isRegister ? 'Create Patient Account' : 'Patient Login'}</Text>
 
                         {isRegister && (
                             <>
-                                <Text style={styles.label}>Full Name</Text>
+                                <Text style={styles.label}>Username</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Jane Doe"
-                                    value={fullName}
-                                    onChangeText={setFullName}
-                                />
-
-                                <Text style={styles.label}>Age (Optional)</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="25"
-                                    keyboardType="numeric"
-                                    value={age}
-                                    onChangeText={setAge}
+                                    placeholder="janedoe"
+                                    autoCapitalize="none"
+                                    value={username}
+                                    onChangeText={setUsername}
                                 />
                             </>
                         )}
 
-                        <Text style={styles.label}>Email Address</Text>
+                        <Text style={styles.label}>{isRegister ? 'Email Address' : 'Username or Email'}</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="user@example.com"
+                            placeholder={isRegister ? "user@example.com" : "username or user@example.com"}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             value={email}
@@ -91,6 +102,19 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
                             value={password}
                             onChangeText={setPassword}
                         />
+
+                        {isRegister && (
+                            <>
+                                <Text style={styles.label}>Confirm Password</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="••••••••"
+                                    secureTextEntry
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                />
+                            </>
+                        )}
 
                         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
                             {loading ? (
@@ -109,7 +133,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
                         <View style={styles.divider} />
 
                         <TouchableOpacity style={styles.doctorPortalBtn} onPress={() => navigation.navigate('DoctorLogin')}>
-                            <Text style={styles.doctorPortalText}>👨‍⚕️ Clinician & Doctor Login</Text>
+                            <Text style={styles.doctorPortalText}>👨‍⚕️ Clinician & Doctor Portal</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -131,7 +155,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: 28
+        marginBottom: 24
     },
     logoCircle: {
         width: 64,
