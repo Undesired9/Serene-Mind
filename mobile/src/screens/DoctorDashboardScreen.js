@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 
-export default function DoctorDashboardScreen() {
+export default function DoctorDashboardScreen({ onLogout }) {
     const [patients, setPatients] = useState([]);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('patients'); // 'patients' | 'appointments'
+    const [activeTab, setActiveTab] = useState('critical'); // 'critical' | 'high' | 'monitoring' | 'stable' | 'appointments'
+
+    const handleLogout = async () => {
+        await AsyncStorage.removeItem('serene_token');
+        await AsyncStorage.removeItem('serene_user');
+        if (onLogout) onLogout();
+    };
 
     const loadDoctorData = async () => {
         try {
@@ -15,8 +22,8 @@ export default function DoctorDashboardScreen() {
                 api.getDoctorPatients(),
                 api.getDoctorAppointments()
             ]);
-            setPatients(patsData);
-            setAppointments(apptsData);
+            setPatients(patsData || []);
+            setAppointments(apptsData || []);
         } catch (err) {
             console.error('Error fetching doctor data', err);
         } finally {
@@ -49,8 +56,13 @@ export default function DoctorDashboardScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Clinician Triage Portal</Text>
-                <Text style={styles.subtitle}>Patient Risk Monitoring & Schedule Management</Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.title}>Clinician Triage Portal</Text>
+                    <Text style={styles.subtitle}>Patient Risk Monitoring & Schedule</Text>
+                </View>
+                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                    <Text style={styles.logoutBtnText}>Logout</Text>
+                </TouchableOpacity>
             </View>
 
             {/* Tab Selector */}
@@ -376,6 +388,18 @@ const styles = StyleSheet.create({
     cancelBtnText: {
         color: '#DC2626',
         fontSize: 12,
-        fontWeight: 'bold'
+        fontWeight: '600'
+    },
+    logoutBtn: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        alignSelf: 'center'
+    },
+    logoutBtnText: {
+        color: '#DC2626',
+        fontWeight: 'bold',
+        fontSize: 12
     }
 });
