@@ -24,45 +24,76 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// URL Normalization Middleware for Vercel Serverless rewrites
+// Bulletproof URL Normalization for Vercel Serverless & Local
 app.use((req, res, next) => {
-    // If Vercel rewrites to /api/index.js or /index.js, extract original path
-    if (req.url.startsWith('/api/index.js') || req.url.startsWith('/index.js') || req.url.startsWith('/api?')) {
-        const queryPath = req.query ? req.query['0'] || req.query['path'] : null;
-        if (queryPath) {
-            req.url = '/' + (Array.isArray(queryPath) ? queryPath.join('/') : queryPath);
-        } else if (req.headers['x-matched-path']) {
-            req.url = req.headers['x-matched-path'];
+    let rawPath = req.url || '/';
+
+    // 1. Extract from Vercel headers if available
+    const vercelPath = req.headers['x-matched-path'] || req.headers['x-now-route-matches'];
+    if (vercelPath && !vercelPath.includes('index.js') && !vercelPath.includes('[...')) {
+        rawPath = vercelPath;
+    } 
+    // 2. Extract from query parameters if Vercel rewrite passed path as query
+    else if (req.query) {
+        if (req.query.path) {
+            const p = Array.isArray(req.query.path) ? req.query.path.join('/') : req.query.path;
+            rawPath = '/' + p;
+        } else if (req.query['0']) {
+            rawPath = '/' + req.query['0'];
         }
     }
-    
-    // Log incoming request
-    console.log(`[API] ${req.method} ${req.url} (original: ${req.originalUrl || req.url})`);
+
+    // Strip query strings
+    rawPath = rawPath.split('?')[0];
+
+    // Clean up Vercel function names from path
+    rawPath = rawPath.replace('/api/index.js', '')
+                     .replace('/api/[...path]', '')
+                     .replace('/index.js', '')
+                     .replace('/[...path]', '');
+
+    // Strip /api prefix so all routes match /auth, /chat, etc.
+    if (rawPath.startsWith('/api/')) {
+        rawPath = rawPath.slice(4);
+    } else if (rawPath === '/api') {
+        rawPath = '/';
+    }
+
+    if (!rawPath.startsWith('/')) {
+        rawPath = '/' + rawPath;
+    }
+
+    req.url = rawPath;
     next();
 });
 
-// Basic health check
-app.get(['/', '/api', '/health-check'], (req, res) => {
+// Health check
+app.get(['/', '/health-check', '/ping'], (req, res) => {
     res.json({ 
         message: 'SereneMind API is running', 
         version: '1.0.0', 
+        status: 'HEALTHY',
         timestamp: new Date().toISOString() 
     });
 });
 
-// Unified API Router (handles all sub-routes)
-const apiRouter = express.Router();
-apiRouter.use('/auth', authRoutes);
-apiRouter.use('/chat', chatRoutes);
-apiRouter.use('/dashboard', dashboardRoutes);
-apiRouter.use('/doctor', doctorRoutes);
-apiRouter.use('/reports', reportsRoutes);
-apiRouter.use('/appointments', appointmentsRoutes);
-apiRouter.use('/health', healthRoutes);
+// Mount all core routes
+app.use('/auth', authRoutes);
+app.use('/chat', chatRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/doctor', doctorRoutes);
+app.use('/reports', reportsRoutes);
+app.use('/appointments', appointmentsRoutes);
+app.use('/health', healthRoutes);
 
-// Mount at both /api and root / to support all rewrite modes
-app.use('/api', apiRouter);
-app.use('/', apiRouter);
+// Fallback: Also mount with /api in case middleware was bypassed
+app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/doctor', doctorRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/appointments', appointmentsRoutes);
+app.use('/api/health', healthRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {
