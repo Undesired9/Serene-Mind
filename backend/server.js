@@ -16,15 +16,22 @@ const healthRoutes = require('./routes/health');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    credentials: true
+}));
 app.use(express.json());
 
 // Basic health check
-app.get('/', (req, res) => {
-    res.json({ message: 'SereneMind API is running' });
+app.get(['/', '/api'], (req, res) => {
+    res.json({ 
+        message: 'SereneMind API is running', 
+        version: '1.0.0', 
+        timestamp: new Date().toISOString() 
+    });
 });
 
-// Mount Routes
+// Mount Routes with /api prefix
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -32,6 +39,15 @@ app.use('/api/doctor', doctorRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/health', healthRoutes);
+
+// Also mount without /api prefix for flexible serverless rewrites
+app.use('/auth', authRoutes);
+app.use('/chat', chatRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/doctor', doctorRoutes);
+app.use('/reports', reportsRoutes);
+app.use('/appointments', appointmentsRoutes);
+app.use('/health', healthRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {
@@ -44,6 +60,10 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+if (process.env.VERCEL !== '1' && require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
