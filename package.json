@@ -1,0 +1,21 @@
+{
+  "name": "serene-mind-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SereneMind AI-Powered Mental Wellness Application",
+  "scripts": {
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "start": "node backend/server.js",
+    "test": "node backend/tests/nfr_validation.test.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@libsql/client": "^0.14.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
