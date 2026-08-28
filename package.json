@@ -1,8 +1,8 @@
 {
-  "name": "serene-mind-monorepo",
+  "name": "serene-mind",
   "version": "1.0.0",
   "private": true,
-  "description": "SereneMind AI-Powered Mental Wellness Application",
+  "description": "SereneMind AI-Powered Mental Wellness Platform",
   "scripts": {
     "build": "npm --prefix frontend install && npm --prefix frontend run build",
     "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build",
