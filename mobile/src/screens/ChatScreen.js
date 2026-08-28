@@ -79,8 +79,23 @@ export default function ChatScreen() {
 
         try {
             const res = await api.sendMessage(currentSessionId, textToSend);
-            if (res.botMessage) {
-                setMessages(prev => [...prev, res.botMessage]);
+            const botText = res.reply || res.message || (res.botMessage && (res.botMessage.content || res.botMessage.message));
+            if (botText) {
+                const botMsg = {
+                    id: Date.now() + 1,
+                    sender: 'ai',
+                    content: botText,
+                    message: botText,
+                    risk_level: res.riskLevel,
+                    timestamp: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, botMsg]);
+            }
+            if (res.isCrisis || res.riskTier === 'CRITICAL' || res.escalationStatus?.is_chat_locked) {
+                Alert.alert(
+                    'Clinical Safety Alert',
+                    'Your safety is our top priority. If you are experiencing immediate distress, please call or text 988 (Suicide & Crisis Lifeline) or contact emergency services.'
+                );
             }
         } catch (err) {
             Alert.alert('Send Error', err.message || 'Failed to send message to AI companion.');
@@ -171,6 +186,7 @@ export default function ChatScreen() {
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                     renderItem={({ item }) => {
                         const isUser = item.sender === 'user';
+                        const msgBody = item.content || item.message || '';
                         return (
                             <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowBot]}>
                                 {!isUser && (
@@ -180,7 +196,7 @@ export default function ChatScreen() {
                                 )}
                                 <View style={[styles.msgBubble, isUser ? styles.msgBubbleUser : styles.msgBubbleBot]}>
                                     <Text style={[styles.msgText, isUser ? styles.msgTextUser : styles.msgTextBot]}>
-                                        {item.message}
+                                        {msgBody}
                                     </Text>
                                 </View>
                             </View>
