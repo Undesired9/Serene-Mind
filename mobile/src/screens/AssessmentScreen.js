@@ -54,18 +54,25 @@ export default function AssessmentScreen({ onComplete }) {
         try {
             const phqTotal = phq9Answers.reduce((a, b) => a + b, 0);
             const gadTotal = gad7Answers.reduce((a, b) => a + b, 0);
+            const hasSelfHarm = phq9Answers[8] > 0;
 
             const result = await api.submitAssessment({
+                depressionScore: phqTotal,
+                anxietyScore: gadTotal,
                 phq9_score: phqTotal,
                 gad7_score: gadTotal,
-                phq9_details: JSON.stringify(phq9Answers),
-                gad7_details: JSON.stringify(gad7Answers)
+                totalScore: phqTotal + gadTotal,
+                answers: [...phq9Answers, ...gad7Answers],
+                selfHarmRisk: hasSelfHarm,
+                mainConcerns: 'Clinical Assessment'
             });
 
-            if (result.user) {
-                await AsyncStorage.setItem('serene_user', JSON.stringify(result.user));
-                onComplete(result.user);
-            }
+            const userStr = await AsyncStorage.getItem('serene_user');
+            const currentUser = userStr ? JSON.parse(userStr) : {};
+            const updatedUser = { ...currentUser, ...(result.user || {}), needsAssessment: false, needsIntake: false };
+            await AsyncStorage.setItem('serene_user', JSON.stringify(updatedUser));
+            Alert.alert('Assessment Completed', 'Your clinical baseline has been recorded.');
+            onComplete(updatedUser);
         } catch (err) {
             Alert.alert('Assessment Error', err.message || 'Failed to submit assessment.');
         } finally {
