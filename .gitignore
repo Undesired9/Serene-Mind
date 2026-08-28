@@ -1,10 +1,8 @@
 # Dependencies
 node_modules/
 
-# Environment files (contain secrets - never commit)
-backend/.env
-frontend/.env
-.env
+# Environment files (tracking explicitly permitted as requested)
+
 
 # API keys / credentials
 backend/kaggle.json
