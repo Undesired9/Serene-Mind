@@ -119,62 +119,64 @@ const validateLoginPayload = ({ identifier, password }) => {
 
 const normalizeText = (value = '') => String(value).trim();
 
-const validateIntakePayload = (payload, accountEmail = '') => {
+const validateIntakePayload = (payload) => {
     const fullLegalName = normalizeText(payload.fullLegalName);
-    const preferredName = normalizeText(payload.preferredName);
+    const dateOfBirth = payload.dateOfBirth;
+    const genderSex = normalizeText(payload.genderSex);
     const phoneNumber = normalizeText(payload.phoneNumber);
-    const emailAddress = normalizeEmail(payload.emailAddress);
     const emergencyContactName = normalizeText(payload.emergencyContactName);
-    const emergencyContactRelationship = normalizeText(payload.emergencyContactRelationship);
     const emergencyContactPhone = normalizeText(payload.emergencyContactPhone);
     const emergencyContactAltPhone = normalizeText(payload.emergencyContactAltPhone);
-    const nationalId = normalizeText(payload.nationalId);
+    const emergencyContactRelationship = normalizeText(payload.emergencyContactRelationship);
     const presentingProblem = normalizeText(payload.presentingProblem);
-    const treatmentGoals = normalizeText(payload.treatmentGoals);
 
-    // Required fields: Full Name, Date of Birth, Presenting Problem
-    if (!fullLegalName || fullLegalName.length < 2) return 'Full legal name is required (at least 2 characters)';
-    if (!PERSON_NAME_PATTERN.test(fullLegalName)) return 'Please enter a valid full legal name';
+    // Required Fields
+    if (!fullLegalName || fullLegalName.length < 2) {
+        return 'Full legal name is required (at least 2 characters)';
+    }
+    if (!PERSON_NAME_PATTERN.test(fullLegalName)) {
+        return 'Please enter a valid full legal name';
+    }
 
-    if (!payload.dateOfBirth) return 'Date of birth is required';
-    const dob = new Date(payload.dateOfBirth);
+    if (!dateOfBirth) {
+        return 'Date of birth is required';
+    }
+    const dob = new Date(dateOfBirth);
     const now = new Date();
     const age = now.getFullYear() - dob.getFullYear() - (
         now.getMonth() < dob.getMonth() ||
         (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0
     );
-    if (Number.isNaN(dob.getTime()) || payload.dateOfBirth > new Date().toISOString().split('T')[0] || age < 5 || age > 120) {
+    if (Number.isNaN(dob.getTime()) || dateOfBirth > new Date().toISOString().split('T')[0] || age < 5 || age > 120) {
         return 'Please enter a valid date of birth (age 5-120)';
     }
 
-    if (!presentingProblem || presentingProblem.length < 3) {
-        return 'Please describe your main concerns or symptoms (at least 3 characters)';
+    if (!genderSex) {
+        return 'Please select your gender';
     }
 
-    // Optional fields validated only if provided
-    if (preferredName && !PERSON_NAME_PATTERN.test(preferredName)) {
-        return 'Enter a valid preferred name';
+    if (!phoneNumber || !PHONE_PATTERN.test(phoneNumber)) {
+        return 'Please enter a valid primary phone number';
     }
-    if (phoneNumber && !PHONE_PATTERN.test(phoneNumber)) {
-        return 'Enter a valid phone number (e.g. +1234567890)';
+
+    if (!emergencyContactName || !PERSON_NAME_PATTERN.test(emergencyContactName)) {
+        return 'Please enter an emergency contact name';
     }
-    if (emailAddress && validateEmail(emailAddress)) {
-        return 'Enter a valid email address';
+
+    if (!emergencyContactPhone || !PHONE_PATTERN.test(emergencyContactPhone)) {
+        return 'Please enter a valid emergency contact phone number';
     }
-    if (nationalId && !NATIONAL_ID_PATTERN.test(nationalId)) {
-        return 'National ID must be 4-30 characters (letters, numbers, slashes, or hyphens)';
+
+    if (!presentingProblem || presentingProblem.length < 3) {
+        return 'Please describe what brings you in or your primary concerns';
     }
-    if (emergencyContactName && !PERSON_NAME_PATTERN.test(emergencyContactName)) {
-        return 'Enter a valid emergency contact name';
+
+    // Optional Fields (validated only if present)
+    if (emergencyContactAltPhone && !PHONE_PATTERN.test(emergencyContactAltPhone)) {
+        return 'Please enter a valid alternative contact phone number';
     }
     if (emergencyContactRelationship && !GENERIC_TEXT_PATTERN.test(emergencyContactRelationship)) {
-        return 'Enter a valid emergency contact relationship';
-    }
-    if (emergencyContactPhone && !PHONE_PATTERN.test(emergencyContactPhone)) {
-        return 'Enter a valid emergency contact phone number';
-    }
-    if (emergencyContactAltPhone && !PHONE_PATTERN.test(emergencyContactAltPhone)) {
-        return 'Enter a valid alternative contact phone number';
+        return 'Please enter a valid emergency contact relationship';
     }
 
     return '';

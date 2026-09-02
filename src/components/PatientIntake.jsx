@@ -1,272 +1,61 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, ShieldCheck, User, HeartHandshake, Sparkles } from 'lucide-react';
 import { API_BASE } from '../apiConfig';
 
 const NAME_PATTERN = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
 const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
-const ID_PATTERN = /^[A-Za-z0-9/-]{4,30}$/;
-const TEXT_ONLY_PATTERN = /^[A-Za-z0-9\s,.'()/-]{2,80}$/;
-
 const TODAY = new Date().toISOString().split('T')[0];
 const MIN_DOB = `${new Date().getFullYear() - 120}-01-01`;
 
-const intakeSections = [
-    {
-        title: 'Basics',
-        shortTitle: 'Basics',
-        description: 'Name, birth date, and contact details.',
-        fields: [
-            { key: 'fullLegalName', label: 'Full legal name', required: true, placeholder: 'Enter full legal name' },
-            { key: 'preferredName', label: 'Preferred name', placeholder: 'Preferred name or nickname (optional)' },
-            { key: 'dateOfBirth', label: 'Date of birth', type: 'date', required: true },
-            { key: 'genderSex', label: 'Gender/sex', placeholder: 'Gender or sex, if relevant (optional)' },
-            { key: 'nationalId', label: 'National ID or patient ID number', placeholder: 'Optional ID number' },
-            { key: 'maritalStatus', label: 'Marital status', placeholder: 'Single, married, divorced, etc. (optional)' },
-            { key: 'occupation', label: 'Occupation', placeholder: 'Current occupation (optional)' },
-            { key: 'educationLevel', label: 'Education level', placeholder: 'Highest completed level (optional)' },
-            { key: 'address', label: 'Address', type: 'textarea', placeholder: 'Current residential address (optional)' },
-            { key: 'phoneNumber', label: 'Phone number', type: 'tel', placeholder: 'Primary phone number (optional)' },
-            { key: 'emailAddress', label: 'Email address', type: 'email', placeholder: 'Patient email address (optional)' }
-        ]
-    },
-    {
-        title: 'Support contact',
-        shortTitle: 'Support',
-        description: 'Who we should contact in an urgent situation (optional).',
-        fields: [
-            { key: 'emergencyContactName', label: 'Name', placeholder: 'Emergency contact full name (optional)' },
-            { key: 'emergencyContactRelationship', label: 'Relationship to patient', placeholder: 'Parent, spouse, sibling, friend, etc. (optional)' },
-            { key: 'emergencyContactPhone', label: 'Phone number', type: 'tel', placeholder: 'Primary emergency contact number (optional)' },
-            { key: 'emergencyContactAltPhone', label: 'Alternative contact number', type: 'tel', placeholder: 'Backup contact number (optional)' },
-            { key: 'emergencyContactAddress', label: 'Address (optional)', type: 'textarea', placeholder: 'Emergency contact address if relevant' }
-        ]
-    },
-    {
-        title: 'How you found us',
-        shortTitle: 'Referral',
-        description: 'How you heard about the service (optional).',
-        fields: [
-            { key: 'referralSource', label: 'How the patient heard about your service', placeholder: 'Self-referral, friend, website, clinic, etc.' },
-            { key: 'referringProvider', label: 'Referring physician, therapist, or organization', placeholder: 'Name of provider or organization' },
-            { key: 'referralReason', label: 'Reason for referral', type: 'textarea', placeholder: 'Reason the patient was referred' }
-        ]
-    },
-    {
-        title: 'What brings you in',
-        shortTitle: 'Current concern',
-        description: 'Your main concerns and what you want help with.',
-        fields: [
-            { key: 'presentingProblem', label: 'Main concerns or symptoms', type: 'textarea', required: true, placeholder: 'Describe what brings you in or symptoms you are experiencing' },
-            { key: 'symptomDuration', label: 'Duration of symptoms', placeholder: 'How long symptoms have been present (optional)' },
-            { key: 'symptomSeverity', label: 'Severity of symptoms', placeholder: 'Mild, moderate, severe, fluctuating, etc. (optional)' },
-            { key: 'seekingHelpReason', label: 'What prompted seeking help now', type: 'textarea', placeholder: 'What changed recently or triggered help-seeking (optional)' },
-            { key: 'treatmentGoals', label: 'Patient goals for treatment', type: 'textarea', placeholder: 'What you hope to improve or achieve (optional)' }
-        ]
-    },
-    {
-        title: 'Mental health history',
-        shortTitle: 'Mental health',
-        description: 'Past diagnoses, therapy, and safety history.',
-        fields: [
-            { key: 'previousPsychiatricDiagnoses', label: 'Previous psychiatric diagnoses', type: 'textarea', placeholder: 'Known diagnoses or prior evaluations' },
-            { key: 'previousCounseling', label: 'Previous counseling or psychotherapy', type: 'textarea', placeholder: 'Previous therapy experience and duration' },
-            { key: 'psychiatricHospitalizations', label: 'Psychiatric hospitalizations', type: 'textarea', placeholder: 'Any past psychiatric admissions' },
-            { key: 'selfHarmHistory', label: 'History of self-harm', type: 'textarea', placeholder: 'Relevant self-harm history, if any' },
-            { key: 'suicideAttempts', label: 'Suicide attempts', type: 'textarea', placeholder: 'Any suicide attempt history, if any' },
-            { key: 'violenceHistory', label: 'History of violence or aggression', type: 'textarea', placeholder: 'Any relevant aggression or violence history' },
-            { key: 'currentMentalHealthProviders', label: 'Current mental health providers', type: 'textarea', placeholder: 'Current therapist, psychiatrist, counselor, etc.' }
-        ]
-    },
-    {
-        title: 'Medical history',
-        shortTitle: 'Medical',
-        description: 'Medical details that may affect care.',
-        fields: [
-            { key: 'currentMedicalConditions', label: 'Current medical conditions', type: 'textarea', placeholder: 'Ongoing health conditions or diagnoses' },
-            { key: 'previousIllnessesOrSurgeries', label: 'Previous major illnesses or surgeries', type: 'textarea', placeholder: 'Relevant past illnesses, admissions, or surgeries' },
-            { key: 'neurologicalConditions', label: 'Neurological conditions', type: 'textarea', placeholder: 'Seizures, head injury, neurological disorders, etc.' },
-            { key: 'currentMedications', label: 'Current medications', type: 'textarea', placeholder: 'List current medications and doses if known' },
-            { key: 'allergies', label: 'Allergies', type: 'textarea', placeholder: 'Medication, food, or environmental allergies' },
-            { key: 'primaryCarePhysicianDetails', label: 'Primary care physician details', type: 'textarea', placeholder: 'Primary doctor name and contact details' }
-        ]
-    },
-    {
-        title: 'Substance use',
-        shortTitle: 'Substance use',
-        description: 'Current or past use and any treatment history.',
-        fields: [
-            { key: 'alcoholUse', label: 'Alcohol use', type: 'textarea', placeholder: 'Frequency, amount, and any concerns' },
-            { key: 'tobaccoUse', label: 'Tobacco/nicotine use', type: 'textarea', placeholder: 'Smoking, vaping, chewing tobacco, etc.' },
-            { key: 'recreationalDrugUse', label: 'Recreational drug use', type: 'textarea', placeholder: 'Substances used and frequency' },
-            { key: 'prescriptionMisuse', label: 'Prescription medication misuse', type: 'textarea', placeholder: 'Any misuse of prescribed medication' },
-            { key: 'addictionTreatmentHistory', label: 'History of addiction treatment', type: 'textarea', placeholder: 'Past rehabilitation or recovery treatment' }
-        ]
-    },
-    {
-        title: 'Family history',
-        shortTitle: 'Family history',
-        description: 'Relevant family mental health and medical history.',
-        fields: [
-            { key: 'familyMentalHealthConditions', label: 'Family mental health conditions', type: 'textarea', placeholder: 'Known family psychiatric conditions' },
-            { key: 'familySubstanceAbuse', label: 'Substance abuse in family', type: 'textarea', placeholder: 'Family substance use concerns' },
-            { key: 'familySuicideHistory', label: 'Suicide history in family', type: 'textarea', placeholder: 'Any known suicide history in the family' },
-            { key: 'familyMedicalConditions', label: 'Significant medical conditions in family', type: 'textarea', placeholder: 'Relevant chronic or inherited medical conditions' }
-        ]
-    },
-    {
-        title: 'Daily life',
-        shortTitle: 'Daily life',
-        description: 'Living situation, support, and day-to-day context.',
-        fields: [
-            { key: 'livingSituation', label: 'Living situation', type: 'textarea', placeholder: 'Who the patient lives with and current housing situation' },
-            { key: 'familyStructure', label: 'Family structure', type: 'textarea', placeholder: 'Family composition and relationships' },
-            { key: 'relationshipStatus', label: 'Relationship status', placeholder: 'Single, partnered, married, separated, etc.' },
-            { key: 'employmentStatus', label: 'Employment status', placeholder: 'Employed, student, unemployed, retired, etc.' },
-            { key: 'financialStressors', label: 'Financial stressors', type: 'textarea', placeholder: 'Financial concerns affecting wellbeing' },
-            { key: 'socialSupportSystem', label: 'Social support system', type: 'textarea', placeholder: 'Supportive people or groups in the patient\'s life' },
-            { key: 'religiousCulturalConsiderations', label: 'Religious/cultural considerations', type: 'textarea', placeholder: 'Any cultural or religious context relevant to care' }
-        ]
-    }
+const GENDER_OPTIONS = [
+    { value: 'Male', label: 'Male' },
+    { value: 'Female', label: 'Female' },
+    { value: 'Non-binary', label: 'Non-binary' },
+    { value: 'Prefer not to say', label: 'Prefer not to say' },
+    { value: 'Other', label: 'Other' }
 ];
 
-const initialFormState = intakeSections.flatMap((section) => section.fields).reduce((acc, field) => {
-    acc[field.key] = '';
-    return acc;
-}, {});
+const RELATIONSHIP_OPTIONS = [
+    { value: 'Parent', label: 'Parent' },
+    { value: 'Spouse/Partner', label: 'Spouse / Partner' },
+    { value: 'Sibling', label: 'Sibling' },
+    { value: 'Child', label: 'Child / Dependent' },
+    { value: 'Friend', label: 'Friend' },
+    { value: 'Guardian', label: 'Guardian' },
+    { value: 'Other', label: 'Other' }
+];
 
-const validateIntakeForm = (formData, accountEmail = '') => {
-    const normalize = (value) => String(value || '').trim();
-
-    // Required fields: Full Legal Name, Date of Birth, Presenting Problem
-    if (!normalize(formData.fullLegalName) || normalize(formData.fullLegalName).length < 2) {
-        return 'Full legal name is required (at least 2 characters)';
-    }
-
-    if (!NAME_PATTERN.test(normalize(formData.fullLegalName))) {
-        return 'Please enter a valid full legal name';
-    }
-
-    if (!formData.dateOfBirth) {
-        return 'Date of birth is required';
-    }
-
-    const dob = new Date(formData.dateOfBirth);
-    const now = new Date();
-    const age = now.getFullYear() - dob.getFullYear() - (
-        now.getMonth() < dob.getMonth() ||
-        (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0
-    );
-
-    if (Number.isNaN(dob.getTime()) || formData.dateOfBirth > TODAY || age < 5 || age > 120) {
-        return 'Please enter a valid date of birth (age 5-120)';
-    }
-
-    if (!normalize(formData.presentingProblem) || normalize(formData.presentingProblem).length < 3) {
-        return 'Please describe your main concerns or symptoms (at least 3 characters)';
-    }
-
-    // Optional fields validated only when provided
-    if (formData.preferredName && !NAME_PATTERN.test(normalize(formData.preferredName))) {
-        return 'Enter a valid preferred name';
-    }
-
-    if (formData.phoneNumber && !PHONE_PATTERN.test(normalize(formData.phoneNumber))) {
-        return 'Enter a valid phone number (e.g. +1234567890)';
-    }
-
-    if (formData.emailAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalize(formData.emailAddress))) {
-        return 'Enter a valid email address';
-    }
-
-    if (formData.nationalId && !ID_PATTERN.test(normalize(formData.nationalId))) {
-        return 'National ID must be 4-30 letters, numbers, slashes, or hyphens';
-    }
-
-    if (formData.emergencyContactName && !NAME_PATTERN.test(normalize(formData.emergencyContactName))) {
-        return 'Enter a valid emergency contact name';
-    }
-
-    if (formData.emergencyContactRelationship && !TEXT_ONLY_PATTERN.test(normalize(formData.emergencyContactRelationship))) {
-        return 'Enter a valid emergency contact relationship';
-    }
-
-    if (formData.emergencyContactPhone && !PHONE_PATTERN.test(normalize(formData.emergencyContactPhone))) {
-        return 'Enter a valid emergency contact phone number';
-    }
-
-    if (formData.emergencyContactAltPhone && !PHONE_PATTERN.test(normalize(formData.emergencyContactAltPhone))) {
-        return 'Enter a valid alternative contact phone number';
-    }
-
-    return '';
-};
+const DURATION_OPTIONS = [
+    { value: 'Just started (< 1 month)', label: 'Just started (< 1 month)' },
+    { value: '1 to 6 months', label: '1 to 6 months' },
+    { value: '6 to 12 months', label: '6 to 12 months' },
+    { value: 'Over 1 year', label: 'Over 1 year' }
+];
 
 const PatientIntake = () => {
     const navigate = useNavigate();
-    const accountEmail = JSON.parse(localStorage.getItem('serene_user') || 'null')?.email || '';
-    const [formData, setFormData] = useState(() => {
-        return {
-            ...initialFormState,
-            emailAddress: accountEmail
-        };
-    });
+    const [currentStep, setCurrentStep] = useState(1); // 1 = Personal & Contact, 2 = Clinical Context
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [activeSection, setActiveSection] = useState(0);
 
-    const totalRequired = useMemo(
-        () => intakeSections.flatMap((section) => section.fields).filter((field) => field.required).length,
-        []
-    );
-    const totalFields = useMemo(
-        () => intakeSections.flatMap((section) => section.fields).length,
-        []
-    );
-    const totalSections = intakeSections.length;
-    const currentSection = intakeSections[activeSection];
+    const [formData, setFormData] = useState({
+        // Step 1: Personal & Emergency
+        fullLegalName: '',
+        dateOfBirth: '',
+        genderSex: '',
+        phoneNumber: '',
+        emergencyContactName: '',
+        emergencyContactPhone: '',
+        emergencyContactRelationship: '',
 
-    const completedRequired = useMemo(
-        () =>
-            intakeSections
-                .flatMap((section) => section.fields)
-                .filter((field) => field.required && formData[field.key]?.trim())
-                .length,
-        [formData]
-    );
-
-    const answeredFields = useMemo(
-        () =>
-            intakeSections
-                .flatMap((section) => section.fields)
-                .filter((field) => formData[field.key]?.trim())
-                .length,
-        [formData]
-    );
-
-    const allRequiredComplete = completedRequired === totalRequired;
-
-    const getAnsweredCount = (section) =>
-        section.fields.filter((field) => formData[field.key]?.trim()).length;
-
-    const isSectionComplete = (section) => {
-        const requiredFields = section.fields.filter((field) => field.required);
-
-        if (requiredFields.length > 0) {
-            return requiredFields.every((field) => formData[field.key]?.trim());
-        }
-
-        return getAnsweredCount(section) === section.fields.length && section.fields.length > 0;
-    };
-
-    const currentSectionAnswered = getAnsweredCount(currentSection);
-
-    const nextMissingRequiredSectionIndex = intakeSections.findIndex(
-        (section) =>
-            section.fields.some((field) => field.required) &&
-            !section.fields.filter((field) => field.required).every((field) => formData[field.key]?.trim())
-    );
+        // Step 2: Clinical Context
+        presentingProblem: '',
+        symptomDuration: '',
+        treatmentGoals: '',
+        currentMedicalConditions: ''
+    });
 
     useEffect(() => {
         const loadExistingIntake = async () => {
@@ -289,65 +78,23 @@ const PatientIntake = () => {
                 }
 
                 if (data.intake) {
-                    setFormData((current) => ({
-                        ...current,
+                    setFormData((prev) => ({
+                        ...prev,
                         fullLegalName: data.intake.full_legal_name || '',
-                        preferredName: data.intake.preferred_name || '',
                         dateOfBirth: data.intake.date_of_birth || '',
                         genderSex: data.intake.gender_sex || '',
-                        nationalId: data.intake.national_id || '',
-                        maritalStatus: data.intake.marital_status || '',
-                        occupation: data.intake.occupation || '',
-                        educationLevel: data.intake.education_level || '',
-                        address: data.intake.address || '',
                         phoneNumber: data.intake.phone_number || '',
-                        emailAddress: data.intake.email_address || current.emailAddress,
                         emergencyContactName: data.intake.emergency_contact_name || '',
-                        emergencyContactRelationship: data.intake.emergency_contact_relationship || '',
                         emergencyContactPhone: data.intake.emergency_contact_phone || '',
-                        emergencyContactAltPhone: data.intake.emergency_contact_alt_phone || '',
-                        emergencyContactAddress: data.intake.emergency_contact_address || '',
-                        referralSource: data.intake.referral_source || '',
-                        referringProvider: data.intake.referring_provider || '',
-                        referralReason: data.intake.referral_reason || '',
+                        emergencyContactRelationship: data.intake.emergency_contact_relationship || '',
                         presentingProblem: data.intake.presenting_problem || '',
                         symptomDuration: data.intake.symptom_duration || '',
-                        symptomSeverity: data.intake.symptom_severity || '',
-                        seekingHelpReason: data.intake.seeking_help_reason || '',
                         treatmentGoals: data.intake.treatment_goals || '',
-                        previousPsychiatricDiagnoses: data.intake.previous_psychiatric_diagnoses || '',
-                        previousCounseling: data.intake.previous_counseling || '',
-                        psychiatricHospitalizations: data.intake.psychiatric_hospitalizations || '',
-                        selfHarmHistory: data.intake.self_harm_history || '',
-                        suicideAttempts: data.intake.suicide_attempts || '',
-                        violenceHistory: data.intake.violence_history || '',
-                        currentMentalHealthProviders: data.intake.current_mental_health_providers || '',
-                        currentMedicalConditions: data.intake.current_medical_conditions || '',
-                        previousIllnessesOrSurgeries: data.intake.previous_illnesses_or_surgeries || '',
-                        neurologicalConditions: data.intake.neurological_conditions || '',
-                        currentMedications: data.intake.current_medications || '',
-                        allergies: data.intake.allergies || '',
-                        primaryCarePhysicianDetails: data.intake.primary_care_physician_details || '',
-                        alcoholUse: data.intake.alcohol_use || '',
-                        tobaccoUse: data.intake.tobacco_use || '',
-                        recreationalDrugUse: data.intake.recreational_drug_use || '',
-                        prescriptionMisuse: data.intake.prescription_misuse || '',
-                        addictionTreatmentHistory: data.intake.addiction_treatment_history || '',
-                        familyMentalHealthConditions: data.intake.family_mental_health_conditions || '',
-                        familySubstanceAbuse: data.intake.family_substance_abuse || '',
-                        familySuicideHistory: data.intake.family_suicide_history || '',
-                        familyMedicalConditions: data.intake.family_medical_conditions || '',
-                        livingSituation: data.intake.living_situation || '',
-                        familyStructure: data.intake.family_structure || '',
-                        relationshipStatus: data.intake.relationship_status || '',
-                        employmentStatus: data.intake.employment_status || '',
-                        financialStressors: data.intake.financial_stressors || '',
-                        socialSupportSystem: data.intake.social_support_system || '',
-                        religiousCulturalConsiderations: data.intake.religious_cultural_considerations || ''
+                        currentMedicalConditions: data.intake.current_medical_conditions || ''
                     }));
                 }
-            } catch (loadError) {
-                setError(loadError.message);
+            } catch (err) {
+                console.warn('Could not prefill intake:', err.message);
             } finally {
                 setLoading(false);
             }
@@ -356,34 +103,93 @@ const PatientIntake = () => {
         loadExistingIntake();
     }, []);
 
-    const handleChange = (key, value) => {
-        setFormData((current) => ({ ...current, [key]: value }));
+    const handleChange = (field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+        if (error) setError('');
     };
 
-    const goToNextSection = () => {
-        if (activeSection < totalSections - 1) {
-            setActiveSection((current) => current + 1);
+    const validateStep1 = () => {
+        const name = formData.fullLegalName.trim();
+        if (!name || name.length < 2) {
+            return 'Please enter your full legal name (at least 2 characters).';
         }
-    };
-
-    const goToPreviousSection = () => {
-        if (activeSection > 0) {
-            setActiveSection((current) => current - 1);
+        if (!NAME_PATTERN.test(name)) {
+            return 'Full legal name should contain letters, spaces, dots, or hyphens only.';
         }
+
+        if (!formData.dateOfBirth) {
+            return 'Date of birth is required.';
+        }
+        const dob = new Date(formData.dateOfBirth);
+        const now = new Date();
+        const age = now.getFullYear() - dob.getFullYear() - (
+            now.getMonth() < dob.getMonth() ||
+            (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0
+        );
+        if (Number.isNaN(dob.getTime()) || formData.dateOfBirth > TODAY || age < 5 || age > 120) {
+            return 'Please enter a valid date of birth (age between 5 and 120).';
+        }
+
+        if (!formData.genderSex) {
+            return 'Please select your gender.';
+        }
+
+        const phone = formData.phoneNumber.trim();
+        if (!phone || !PHONE_PATTERN.test(phone)) {
+            return 'Please enter a valid primary phone number.';
+        }
+
+        const eName = formData.emergencyContactName.trim();
+        if (!eName || !NAME_PATTERN.test(eName)) {
+            return 'Please enter an emergency contact full name.';
+        }
+
+        const ePhone = formData.emergencyContactPhone.trim();
+        if (!ePhone || !PHONE_PATTERN.test(ePhone)) {
+            return 'Please enter a valid emergency contact phone number.';
+        }
+
+        return '';
     };
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
+    const validateStep2 = () => {
+        const problem = formData.presentingProblem.trim();
+        if (!problem || problem.length < 3) {
+            return 'Please provide a brief description of what brings you in.';
+        }
+        return '';
+    };
+
+    const handleNext = (e) => {
+        e.preventDefault();
+        const step1Error = validateStep1();
+        if (step1Error) {
+            setError(step1Error);
+            return;
+        }
         setError('');
-        const validationError = validateIntakeForm(formData, accountEmail);
+        setCurrentStep(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-        if (validationError) {
-            setError(validationError);
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        const step1Error = validateStep1();
+        if (step1Error) {
+            setCurrentStep(1);
+            setError(step1Error);
+            return;
+        }
+
+        const step2Error = validateStep2();
+        if (step2Error) {
+            setError(step2Error);
             return;
         }
 
         setSaving(true);
-
         try {
             const token = localStorage.getItem('serene_token');
             const response = await fetch(`${API_BASE}/api/auth/intake`, {
@@ -401,12 +207,9 @@ const PatientIntake = () => {
                 data = await response.json();
             } else {
                 const text = await response.text();
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = { error: text || `Server error (${response.status})` };
-                }
+                try { data = JSON.parse(text); } catch { data = { error: text || `Server error (${response.status})` }; }
             }
+
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to save intake form.');
             }
@@ -436,195 +239,298 @@ const PatientIntake = () => {
 
     return (
         <div className="min-h-screen bg-[#E8E8E8] py-8 px-4 md:px-8">
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-3xl mx-auto">
+                {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
-                        <ClipboardList className="text-[#1B98E0]" size={30} />
+                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-3">
+                        <ClipboardList className="text-[#1B98E0]" size={28} />
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-[#0D1B2A] mb-3">Quick intake</h1>
-                    <p className="text-[#3D5A80] max-w-3xl mx-auto">
-                        Fill the essentials first, then add any extra context that feels useful. Optional sections can be skipped, and your answers help give the doctor context before the assessment.
+                    <h1 className="text-2xl md:text-3xl font-bold text-[#0D1B2A] mb-2">Patient Intake Form</h1>
+                    <p className="text-[#3D5A80] text-sm md:text-base max-w-xl mx-auto">
+                        Please provide your baseline contact and care details before starting your mental health assessment.
                     </p>
                 </div>
 
-                <div className="bg-white rounded-2xl p-5 md:p-6 border border-[#0E7C7B]/10 shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                    <ShieldCheck className="text-emerald-500 shrink-0 mt-1" size={22} />
-                    <div>
-                        <p className="font-semibold text-[#0D1B2A]">Secure clinical intake</p>
-                        <p className="text-sm text-[#3D5A80] mt-1">
-                            Only {totalRequired} fields are required. Everything else is optional background you can fill in now or keep brief.
-                        </p>
+                {/* Progress Card */}
+                <div className="bg-white rounded-2xl p-4 md:p-5 border border-[#0E7C7B]/10 shadow-sm mb-6">
+                    <div className="flex items-center justify-between mb-3 text-xs font-semibold text-[#3D5A80]">
+                        <span className="flex items-center gap-1.5">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs text-white ${currentStep >= 1 ? 'bg-[#1B98E0]' : 'bg-gray-300'}`}>1</span>
+                            Personal & Contact
+                        </span>
+                        <div className="h-0.5 flex-1 mx-3 bg-[#E8E8E8]">
+                            <div className={`h-full bg-[#1B98E0] transition-all duration-300 ${currentStep === 2 ? 'w-full' : 'w-0'}`} />
+                        </div>
+                        <span className="flex items-center gap-1.5">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs text-white ${currentStep === 2 ? 'bg-[#1B98E0]' : 'bg-gray-300'}`}>2</span>
+                            Care Context
+                        </span>
                     </div>
-                    </div>
-                    <div className="rounded-2xl bg-[#F8FBFB] border border-[#0E7C7B]/10 px-4 py-3 min-w-[220px]">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-[#3D5A80] mb-1">Progress</p>
-                        <p className="text-sm text-[#0D1B2A] font-semibold">{completedRequired} of {totalRequired} required fields completed</p>
-                        <p className="text-xs text-[#3D5A80] mt-1">{answeredFields} of {totalFields} fields answered</p>
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                        <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                        <span>Confidential and strictly protected under clinical privacy standards.</span>
                     </div>
                 </div>
 
+                {/* Error Banner */}
                 {error && (
-                    <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 text-rose-700">
-                        {error}
+                    <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-200 px-4 py-3 text-rose-700 text-sm font-medium shadow-sm flex items-center justify-between">
+                        <span>{error}</span>
+                        <button type="button" onClick={() => setError('')} className="text-rose-500 hover:text-rose-800 text-xs font-bold ml-3">✕</button>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                        {intakeSections.map((section, index) => {
-                            const complete = isSectionComplete(section);
-                            const active = index === activeSection;
-
-                            return (
-                                <button
-                                    key={section.title}
-                                    type="button"
-                                    onClick={() => setActiveSection(index)}
-                                    className={`rounded-2xl border px-4 py-3 text-left transition-all ${active
-                                        ? 'border-[#1B98E0] bg-[#1B98E0]/10 shadow-sm'
-                                        : 'border-[#0E7C7B]/10 bg-white hover:border-[#1B98E0]/30'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-sm font-semibold text-[#0D1B2A]">{section.shortTitle}</span>
-                                        {complete ? (
-                                            <CheckCircle2 size={16} className="text-emerald-500" />
-                                        ) : (
-                                            <span className="text-[11px] font-semibold text-[#3D5A80]">
-                                                {getAnsweredCount(section)}/{section.fields.length}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-[#3D5A80] mt-1 line-clamp-2">{section.description}</p>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <section className="bg-white rounded-3xl border border-[#0E7C7B]/10 shadow-sm p-5 md:p-6">
-                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-5">
-                            <div>
-                                <h2 className="text-lg font-bold text-[#0D1B2A]">{currentSection.title}</h2>
-                                <p className="text-sm text-[#3D5A80] mt-1">{currentSection.description}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <div className="rounded-xl bg-[#F8FBFB] border border-[#0E7C7B]/10 px-3 py-2 text-xs text-[#3D5A80]">
-                                    {currentSectionAnswered} of {currentSection.fields.length} answered
+                {/* Main Form */}
+                <form onSubmit={currentStep === 1 ? handleNext : handleSubmit}>
+                    {/* STEP 1: Personal & Emergency Support */}
+                    {currentStep === 1 && (
+                        <div className="bg-white rounded-3xl border border-[#0E7C7B]/10 shadow-sm p-6 md:p-8 space-y-6">
+                            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                                <div className="p-2 bg-[#1B98E0]/10 rounded-xl text-[#1B98E0]">
+                                    <User size={20} />
                                 </div>
-                                <div className="rounded-xl bg-[#F8FBFB] border border-[#0E7C7B]/10 px-3 py-2 text-xs text-[#3D5A80]">
-                                    {currentSection.fields.filter((field) => field.required).length > 0
-                                        ? `${currentSection.fields.filter((field) => field.required).length} required here`
-                                        : 'Optional section'}
+                                <div>
+                                    <h2 className="text-lg font-bold text-[#0D1B2A]">Personal & Emergency Contact</h2>
+                                    <p className="text-xs text-[#3D5A80]">Essential identification and emergency crisis contact.</p>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {currentSection.fields.map((field) => {
-                                const isTextarea = field.type === 'textarea';
-                                const isLockedEmailField = field.key === 'emailAddress' && Boolean(formData.emailAddress);
-                                const commonClassName = `w-full rounded-2xl border border-[#0E7C7B]/15 bg-[#F8FBFB] px-4 py-3 outline-none focus:border-[#1B98E0] text-[#0D1B2A] ${isTextarea ? 'min-h-[110px] resize-y' : ''}`;
-                                const wrapperClass = isTextarea ? 'md:col-span-2' : '';
-                                const inputProps = field.key === 'fullLegalName' || field.key === 'preferredName' || field.key === 'emergencyContactName'
-                                    ? { minLength: 2, maxLength: 80, pattern: NAME_PATTERN.source, title: 'Use letters, spaces, apostrophes, dots, or hyphens only.' }
-                                    : field.key === 'phoneNumber' || field.key === 'emergencyContactPhone' || field.key === 'emergencyContactAltPhone'
-                                        ? { minLength: 7, maxLength: 20, pattern: PHONE_PATTERN.source, title: 'Enter a valid phone number.' }
-                                        : field.key === 'dateOfBirth'
-                                            ? { min: MIN_DOB, max: TODAY }
-                                            : field.key === 'nationalId'
-                                                ? { minLength: 4, maxLength: 30, pattern: ID_PATTERN.source, title: 'Use 4-30 letters, numbers, slashes, or hyphens.' }
-                                                : field.key === 'emailAddress'
-                                                    ? { maxLength: 254 }
-                                                    : field.key === 'emergencyContactRelationship'
-                                                        ? { minLength: 2, maxLength: 80, pattern: TEXT_ONLY_PATTERN.source, title: 'Use letters and basic punctuation only.' }
-                                                        : isTextarea
-                                                            ? { maxLength: 500 }
-                                                            : { maxLength: 80 };
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {/* Full Name */}
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Full Legal Name <span className="text-rose-500">*</span></span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.fullLegalName}
+                                        onChange={(e) => handleChange('fullLegalName', e.target.value)}
+                                        placeholder="e.g. John Doe"
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                        required
+                                    />
+                                </div>
 
-                                return (
-                                    <div key={field.key} className={wrapperClass}>
-                                        <label className="flex items-center justify-between gap-3 text-sm font-semibold text-[#3D5A80] mb-1.5">
-                                            <span>{field.label}</span>
-                                            <span className={field.required ? 'text-[#1B98E0]' : 'text-[#3D5A80]/70'}>
-                                                {field.required ? 'Required' : 'Optional'}
-                                            </span>
+                                {/* Date of Birth */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Date of Birth <span className="text-rose-500">*</span></span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={formData.dateOfBirth}
+                                        min={MIN_DOB}
+                                        max={TODAY}
+                                        onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                        required
+                                    />
+                                </div>
+
+                                {/* Gender */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Gender <span className="text-rose-500">*</span></span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                    </label>
+                                    <select
+                                        value={formData.genderSex}
+                                        onChange={(e) => handleChange('genderSex', e.target.value)}
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                        required
+                                    >
+                                        <option value="">Select gender...</option>
+                                        {GENDER_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Phone Number */}
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Primary Phone Number <span className="text-rose-500">*</span></span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={formData.phoneNumber}
+                                        onChange={(e) => handleChange('phoneNumber', e.target.value)}
+                                        placeholder="e.g. +1 555-0199"
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Emergency Contact Subsection */}
+                            <div className="border-t border-gray-100 pt-5 mt-2 space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <HeartHandshake className="text-[#0E7C7B]" size={18} />
+                                    <h3 className="text-sm font-bold text-[#0D1B2A] uppercase tracking-wider">Emergency Contact Person</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="flex items-center justify-between text-xs font-semibold text-[#3D5A80] mb-1.5">
+                                            <span>Contact Full Name <span className="text-rose-500">*</span></span>
+                                            <span className="text-[10px] text-[#1B98E0]">Required</span>
                                         </label>
-                                        {isLockedEmailField && (
-                                            <p className="text-xs text-[#3D5A80] mb-1.5">
-                                                This uses the email from your account and cannot be changed here.
-                                            </p>
-                                        )}
-                                        {isTextarea ? (
-                                            <textarea
-                                                value={formData[field.key]}
-                                                onChange={(event) => handleChange(field.key, event.target.value)}
-                                                className={commonClassName}
-                                                required={field.required}
-                                                placeholder={field.placeholder}
-                                                {...inputProps}
-                                            />
-                                        ) : (
-                                            <input
-                                                type={field.type || 'text'}
-                                                value={formData[field.key]}
-                                                onChange={(event) => handleChange(field.key, event.target.value)}
-                                                className={commonClassName}
-                                                required={field.required}
-                                                placeholder={field.placeholder}
-                                                readOnly={isLockedEmailField}
-                                                disabled={isLockedEmailField}
-                                                {...inputProps}
-                                            />
-                                        )}
+                                        <input
+                                            type="text"
+                                            value={formData.emergencyContactName}
+                                            onChange={(e) => handleChange('emergencyContactName', e.target.value)}
+                                            placeholder="e.g. Jane Doe"
+                                            className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                            required
+                                        />
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </section>
 
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white rounded-3xl border border-[#0E7C7B]/10 shadow-sm p-5 md:p-6">
-                        <p className="text-sm text-[#3D5A80]">
-                            You can move between sections anytime. Once the required fields are done, you can continue straight to the assessment.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <button
-                                type="button"
-                                onClick={goToPreviousSection}
-                                disabled={activeSection === 0}
-                                className="px-5 py-3 rounded-2xl border border-[#0E7C7B]/15 text-[#0D1B2A] font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                <ArrowLeft size={18} /> Previous
-                            </button>
-                            {activeSection < totalSections - 1 && (
+                                    <div>
+                                        <label className="flex items-center justify-between text-xs font-semibold text-[#3D5A80] mb-1.5">
+                                            <span>Contact Phone Number <span className="text-rose-500">*</span></span>
+                                            <span className="text-[10px] text-[#1B98E0]">Required</span>
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={formData.emergencyContactPhone}
+                                            onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
+                                            placeholder="e.g. +1 555-0188"
+                                            className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="flex items-center justify-between text-xs font-semibold text-[#3D5A80] mb-1.5">
+                                            <span>Relationship to You</span>
+                                            <span className="text-[10px] text-gray-400">Optional</span>
+                                        </label>
+                                        <select
+                                            value={formData.emergencyContactRelationship}
+                                            onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)}
+                                            className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                        >
+                                            <option value="">Select relationship (optional)...</option>
+                                            {RELATIONSHIP_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Step 1 Actions */}
+                            <div className="flex justify-end pt-4 border-t border-gray-100">
+                                <button
+                                    type="submit"
+                                    className="bg-[#1B98E0] hover:bg-[#1689C9] text-white font-bold py-3 px-7 rounded-xl transition-all shadow-md shadow-[#1B98E0]/20 flex items-center gap-2 text-sm"
+                                >
+                                    Continue to Care Context <ArrowRight size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP 2: Clinical Care Context */}
+                    {currentStep === 2 && (
+                        <div className="bg-white rounded-3xl border border-[#0E7C7B]/10 shadow-sm p-6 md:p-8 space-y-6">
+                            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                                <div className="p-2 bg-[#0E7C7B]/10 rounded-xl text-[#0E7C7B]">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-[#0D1B2A]">Care & Wellness Context</h2>
+                                    <p className="text-xs text-[#3D5A80]">Help the AI and clinicians understand what you are seeking support for.</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-5">
+                                {/* Presenting Problem */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Primary Concern / What brings you to SereneMind <span className="text-rose-500">*</span></span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.presentingProblem}
+                                        onChange={(e) => handleChange('presentingProblem', e.target.value)}
+                                        placeholder="Describe what you are currently experiencing (e.g. anxiety, work stress, sleep issues, low mood, relationship changes)..."
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white min-h-[110px] resize-y transition"
+                                        required
+                                    />
+                                </div>
+
+                                {/* Symptom Duration */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Approximate Duration of Symptoms</span>
+                                        <span className="text-[11px] text-gray-400 font-medium">Optional</span>
+                                    </label>
+                                    <select
+                                        value={formData.symptomDuration}
+                                        onChange={(e) => handleChange('symptomDuration', e.target.value)}
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
+                                    >
+                                        <option value="">Select timeframe (optional)...</option>
+                                        {DURATION_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Goals */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>What are your personal goals for therapy or wellness support?</span>
+                                        <span className="text-[11px] text-gray-400 font-medium">Optional</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.treatmentGoals}
+                                        onChange={(e) => handleChange('treatmentGoals', e.target.value)}
+                                        placeholder="e.g. Learn coping mechanisms, improve sleep, manage panic attacks, regain motivation..."
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white min-h-[90px] resize-y transition"
+                                    />
+                                </div>
+
+                                {/* Medical conditions / meds */}
+                                <div>
+                                    <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
+                                        <span>Relevant Medical Conditions or Current Medications</span>
+                                        <span className="text-[11px] text-gray-400 font-medium">Optional</span>
+                                    </label>
+                                    <textarea
+                                        value={formData.currentMedicalConditions}
+                                        onChange={(e) => handleChange('currentMedicalConditions', e.target.value)}
+                                        placeholder="List any physical health conditions or current medications (optional)..."
+                                        className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white min-h-[80px] resize-y transition"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Step 2 Actions */}
+                            <div className="flex items-center justify-between pt-5 border-t border-gray-100">
                                 <button
                                     type="button"
-                                    onClick={goToNextSection}
-                                    className="px-5 py-3 rounded-2xl bg-[#0E7C7B] hover:bg-[#0A5E5D] text-white font-semibold flex items-center justify-center gap-2"
+                                    onClick={() => { setError(''); setCurrentStep(1); }}
+                                    className="px-5 py-2.5 rounded-xl border border-[#0E7C7B]/20 text-[#0D1B2A] font-semibold flex items-center gap-2 text-sm hover:bg-gray-50 transition"
                                 >
-                                    {currentSection.fields.every((field) => !field.required) ? 'Skip for now' : 'Next section'} <ArrowRight size={18} />
+                                    <ArrowLeft size={16} /> Back to Step 1
                                 </button>
-                            )}
-                            {allRequiredComplete ? (
+
                                 <button
                                     type="submit"
                                     disabled={saving}
-                                    className="bg-[#1B98E0] hover:bg-[#1689C9] disabled:opacity-60 text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-md shadow-[#1B98E0]/20 flex items-center justify-center gap-2"
+                                    className="bg-[#1B98E0] hover:bg-[#1689C9] disabled:opacity-60 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md shadow-[#1B98E0]/20 flex items-center gap-2 text-sm"
                                 >
-                                    {saving ? 'Saving intake...' : 'Continue to assessment'}
-                                    {!saving && <ArrowRight size={18} />}
+                                    {saving ? 'Saving...' : 'Proceed to Clinical Assessment'}
+                                    {!saving && <CheckCircle2 size={18} />}
                                 </button>
-                            ) : activeSection === totalSections - 1 && nextMissingRequiredSectionIndex >= 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveSection(nextMissingRequiredSectionIndex)}
-                                    className="bg-[#1B98E0] hover:bg-[#1689C9] text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-md shadow-[#1B98E0]/20 flex items-center justify-center gap-2"
-                                >
-                                    Review required fields <ArrowRight size={18} />
-                                </button>
-                            ) : null}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </form>
             </div>
         </div>
