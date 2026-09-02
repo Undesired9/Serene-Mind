@@ -17,15 +17,7 @@ const MEDIUM_RISK_KEYWORDS = [
     'sad', 'stressed', 'worried', 'upset', 'frustrated', 'angry', 'tired'
 ];
 
-const FAST_FREE_MODELS = [
-    'nvidia/nemotron-3.5-lightning:free',
-    'google/gemini-2.0-flash-lite-preview:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'qwen/qwen-2.5-72b-instruct:free',
-    'mistralai/mistral-small-24b-instruct-2501:free'
-];
-
-const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
+const PRIMARY_MODEL = 'nvidia/nemotron-3.5-lightning:free';
 const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2));
 const BASE_RETRY_DELAY_MS = Math.max(150, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 400));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -205,7 +197,7 @@ const getRetryDelay = (attempt) =>
     BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 150);
 
 /**
- * Call OpenRouter API with the given messages and fallback models.
+ * Call OpenRouter API with nvidia/nemotron-3.5-lightning:free.
  */
 const callOpenRouter = async (messages, options = {}) => {
     const apiKey = process.env.serenemind;
@@ -214,72 +206,63 @@ const callOpenRouter = async (messages, options = {}) => {
     }
 
     const {
-        model = PRIMARY_MODEL,
         maxTokens = 250,
         temperature = 0.6,
         topP = 0.9
     } = options;
 
-    const candidateModels = Array.from(new Set([
-        model,
-        ...FAST_FREE_MODELS
-    ]));
-
     let lastError;
 
-    for (const currentModel of candidateModels) {
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                const response = await fetch(OPENROUTER_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json',
-                        'HTTP-Referer': 'https://serenemind.vercel.app',
-                        'X-Title': 'SereneMind'
-                    },
-                    body: JSON.stringify({
-                        model: currentModel,
-                        messages,
-                        max_tokens: maxTokens,
-                        temperature,
-                        top_p: topP
-                    })
-                });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://serenemind.vercel.app',
+                    'X-Title': 'SereneMind'
+                },
+                body: JSON.stringify({
+                    model: PRIMARY_MODEL,
+                    messages,
+                    max_tokens: maxTokens,
+                    temperature,
+                    top_p: topP
+                })
+            });
 
-                if (!response.ok) {
-                    const errorBody = await response.text().catch(() => 'Unknown error');
-                    const error = new Error(`OpenRouter API error (${currentModel}): ${response.status} - ${errorBody}`);
-                    error.status = response.status;
+            if (!response.ok) {
+                const errorBody = await response.text().catch(() => 'Unknown error');
+                const error = new Error(`OpenRouter API error (${PRIMARY_MODEL}): ${response.status} - ${errorBody}`);
+                error.status = response.status;
 
-                    if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
-                        const delay = getRetryDelay(attempt);
-                        await sleep(delay);
-                        continue;
-                    }
-
-                    // Try next model candidate
-                    lastError = error;
-                    break;
-                }
-
-                const data = await response.json();
-                const content = data?.choices?.[0]?.message?.content;
-
-                if (!content) {
-                    throw new Error(`No content in OpenRouter response from ${currentModel}`);
-                }
-
-                return content;
-            } catch (error) {
-                lastError = error;
-
-                if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
+                if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
                     const delay = getRetryDelay(attempt);
                     await sleep(delay);
                     continue;
                 }
-                break;
+                throw error;
+            }
+
+            const data = await response.json();
+            const content = data?.choices?.[0]?.message?.content;
+
+            if (!content) {
+                throw new Error(`No content in OpenRouter response from ${PRIMARY_MODEL}`);
+            }
+
+            return content;
+        } catch (error) {
+            lastError = error;
+
+            if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
+                const delay = getRetryDelay(attempt);
+                await sleep(delay);
+                continue;
+            }
+            if (attempt >= MAX_RETRIES) {
+                throw error;
             }
         }
     }
@@ -404,7 +387,7 @@ Write a short clinical summary.
 };
 
 /**
- * Stream OpenRouter completions using server-sent chunks
+ * Stream OpenRouter completions using server-sent chunks with nvidia/nemotron-3.5-lightning:free
  */
 const streamOpenRouter = async (messages, onChunk, options = {}) => {
     const apiKey = process.env.serenemind;
@@ -413,58 +396,50 @@ const streamOpenRouter = async (messages, onChunk, options = {}) => {
     }
 
     const {
-        model = PRIMARY_MODEL,
         maxTokens = 250,
         temperature = 0.6,
         topP = 0.9
     } = options;
 
-    const candidateModels = Array.from(new Set([
-        model,
-        ...FAST_FREE_MODELS
-    ]));
-
     let lastError;
 
-    for (const currentModel of candidateModels) {
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                const response = await fetch(OPENROUTER_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json',
-                        'HTTP-Referer': 'https://serenemind.vercel.app',
-                        'X-Title': 'SereneMind'
-                    },
-                    body: JSON.stringify({
-                        model: currentModel,
-                        messages,
-                        max_tokens: maxTokens,
-                        temperature,
-                        top_p: topP,
-                        stream: true
-                    })
-                });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://serenemind.vercel.app',
+                    'X-Title': 'SereneMind'
+                },
+                body: JSON.stringify({
+                    model: PRIMARY_MODEL,
+                    messages,
+                    max_tokens: maxTokens,
+                    temperature,
+                    top_p: topP,
+                    stream: true
+                })
+            });
 
-                if (!response.ok) {
-                    const errorBody = await response.text().catch(() => 'Unknown error');
-                    const error = new Error(`OpenRouter stream error (${currentModel}): ${response.status} - ${errorBody}`);
-                    error.status = response.status;
+            if (!response.ok) {
+                const errorBody = await response.text().catch(() => 'Unknown error');
+                const error = new Error(`OpenRouter stream error (${PRIMARY_MODEL}): ${response.status} - ${errorBody}`);
+                error.status = response.status;
 
-                    if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
-                        const delay = getRetryDelay(attempt);
-                        await sleep(delay);
-                        continue;
-                    }
-                    lastError = error;
-                    break;
+                if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
+                    const delay = getRetryDelay(attempt);
+                    await sleep(delay);
+                    continue;
                 }
+                throw error;
+            }
 
-                let fullContent = '';
+            let fullContent = '';
 
-                if (response.body && response.body.getReader) {
-                    const reader = response.body.getReader();
+            if (response.body && response.body.getReader) {
+                const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     let buffer = '';
 
@@ -534,13 +509,14 @@ const streamOpenRouter = async (messages, onChunk, options = {}) => {
                     await sleep(delay);
                     continue;
                 }
-                break;
+                if (attempt >= MAX_RETRIES) {
+                    throw err;
+                }
             }
         }
-    }
 
-    throw lastError;
-};
+        throw lastError;
+    };
 
 module.exports = {
     handleChat,
