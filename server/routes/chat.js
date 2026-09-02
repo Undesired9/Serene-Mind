@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { handleChat } = require('../services/aiService');
+const { 
+    handleChat, 
+    streamOpenRouter, 
+    buildSystemPrompt, 
+    cleanOutput, 
+    sanitizeHistoryForOpenRouter, 
+    checkApiKey 
+} = require('../services/aiService');
 const { evaluateMultiSignalRisk } = require('../services/riskEngine');
 const { getRecommendedInterventions } = require('../services/interventionEngine');
 const { logAuditEvent } = require('../services/auditLogger');
@@ -245,9 +252,9 @@ async function getUserAssessment(userId) {
     });
 }
 
-// POST: Add new message to a session and get AI response
+// POST: Add new message to a session and get AI response (supports streaming)
 router.post('/', verifyToken, async (req, res) => {
-    let { message, history, sessionId } = req.body;
+    let { message, history, sessionId, stream = true } = req.body;
     const userId = req.user.id;
     
     if (!message) {
@@ -273,6 +280,8 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
+        const wantsStream = stream === true || req.headers.accept?.includes('text/event-stream');
+
         // 2. If Critical Risk flagged on active message, send safe crisis fallback immediately
         if (isCritical) {
             const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the Umang Pakistan Mental Health Helpline (call 0311-7786264), call Rescue 1122, or reach out to a trusted loved one or emergency doctor immediately. You do not have to carry this alone.";
@@ -287,8 +296,29 @@ router.post('/', verifyToken, async (req, res) => {
             });
 
             await updateUserEscalationStatus(userId, 95, 'CRITICAL', true);
-
             const updatedStatus = await getOrCreateUserEscalationStatus(userId);
+            const interventions = getRecommendedInterventions('CRITICAL', message);
+
+            if (wantsStream) {
+                res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+                res.setHeader('Cache-Control', 'no-cache, no-transform');
+                res.setHeader('Connection', 'keep-alive');
+                res.flushHeaders?.();
+
+                res.write(`data: ${JSON.stringify({ chunk: crisisReply })}\n\n`);
+                res.write(`data: ${JSON.stringify({ 
+                    done: true, 
+                    reply: crisisReply, 
+                    riskLevel: 'CRITICAL', 
+                    riskScore: 95, 
+                    riskTier: 'CRITICAL', 
+                    isCrisis: true,
+                    interventions,
+                    sessionId, 
+                    escalationStatus: updatedStatus 
+                })}\n\n`);
+                return res.end();
+            }
 
             return res.json({
                 reply: crisisReply,
@@ -296,7 +326,7 @@ router.post('/', verifyToken, async (req, res) => {
                 riskScore: 95,
                 riskTier: 'CRITICAL',
                 isCrisis: true,
-                interventions: getRecommendedInterventions('CRITICAL', message),
+                interventions,
                 sessionId,
                 escalationStatus: updatedStatus
             });
@@ -304,9 +334,65 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 3. Process via AI service with assessment data
         const assessment = await getUserAssessment(userId);
+        const chatHistory = sanitizeHistoryForOpenRouter(history);
+        const systemPrompt = buildSystemPrompt(assessment);
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...chatHistory,
+            { role: 'user', content: message }
+        ];
+
+        // 4. Try streaming if requested
+        if (wantsStream && checkApiKey()) {
+            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+
+            let accumulatedRaw = '';
+
+            try {
+                await streamOpenRouter(messages, (chunk) => {
+                    accumulatedRaw += chunk;
+                    res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+                }, { maxTokens: 250, temperature: 0.6, topP: 0.9 });
+
+                const cleanedReply = cleanOutput(accumulatedRaw) || "I hear you. Tell me more about that.";
+
+                // Save to SQL DB
+                await new Promise((resolve, reject) => {
+                    db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
+                    [userId, cleanedReply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
+                    function(err) {
+                        if (err) reject(err);
+                        resolve();
+                    });
+                });
+
+                await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
+                const updatedStatus = await getOrCreateUserEscalationStatus(userId);
+                const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
+
+                res.write(`data: ${JSON.stringify({
+                    done: true,
+                    reply: cleanedReply,
+                    riskLevel: multiSignalEval.riskLevel,
+                    riskScore: multiSignalEval.riskScore,
+                    riskTier: multiSignalEval.riskLevel,
+                    interventions: recommendedInterventions,
+                    sessionId,
+                    escalationStatus: updatedStatus
+                })}\n\n`);
+                return res.end();
+            } catch (streamErr) {
+                console.warn('Stream failed, continuing to non-streaming fallback:', streamErr.message);
+            }
+        }
+
+        // 5. Non-streaming fallback
         const responseData = await handleChat(message, history, assessment);
         
-        // 4. Save AI's response to SQL DB
         await new Promise((resolve, reject) => {
             db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
             [userId, responseData.reply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
@@ -316,18 +402,28 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 5. Update user's escalation status (keep unlocked for normal conversational support)
-        await updateUserEscalationStatus(
-            userId, 
-            multiSignalEval.riskScore, 
-            multiSignalEval.riskLevel, 
-            false
-        );
-
+        await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
         const updatedStatus = await getOrCreateUserEscalationStatus(userId);
-
-        // 6. Return response with recommended structured interventions
         const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
+
+        if (wantsStream && !res.headersSent) {
+            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+            res.write(`data: ${JSON.stringify({ chunk: responseData.reply })}\n\n`);
+            res.write(`data: ${JSON.stringify({
+                done: true,
+                ...responseData,
+                riskLevel: multiSignalEval.riskLevel,
+                riskScore: multiSignalEval.riskScore,
+                riskTier: multiSignalEval.riskLevel,
+                interventions: recommendedInterventions,
+                sessionId,
+                escalationStatus: updatedStatus
+            })}\n\n`);
+            return res.end();
+        }
 
         res.json({ 
             ...responseData, 
@@ -340,7 +436,11 @@ router.post('/', verifyToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Chat routing error:', error);
-        res.status(500).json({ error: 'An error occurred while communicating with the AI Therapist' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'An error occurred while communicating with the AI Therapist' });
+        } else {
+            res.end();
+        }
     }
 });
 

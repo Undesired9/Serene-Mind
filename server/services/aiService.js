@@ -372,12 +372,155 @@ Write a short clinical summary.
     }
 };
 
+/**
+ * Stream OpenRouter completions using server-sent chunks
+ */
+const streamOpenRouter = async (messages, onChunk, options = {}) => {
+    const apiKey = process.env.serenemind;
+    if (!apiKey) {
+        throw new Error("OpenRouter API key ('serenemind') not found in environment variables");
+    }
+
+    const {
+        model = PRIMARY_MODEL,
+        maxTokens = 250,
+        temperature = 0.6,
+        topP = 0.9
+    } = options;
+
+    const candidateModels = Array.from(new Set([
+        model,
+        ...FAST_FREE_MODELS
+    ]));
+
+    let lastError;
+
+    for (const currentModel of candidateModels) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await fetch(OPENROUTER_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://serenemind.vercel.app',
+                        'X-Title': 'SereneMind'
+                    },
+                    body: JSON.stringify({
+                        model: currentModel,
+                        messages,
+                        max_tokens: maxTokens,
+                        temperature,
+                        top_p: topP,
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text().catch(() => 'Unknown error');
+                    const error = new Error(`OpenRouter stream error (${currentModel}): ${response.status} - ${errorBody}`);
+                    error.status = response.status;
+
+                    if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
+                        const delay = getRetryDelay(attempt);
+                        await sleep(delay);
+                        continue;
+                    }
+                    lastError = error;
+                    break;
+                }
+
+                let fullContent = '';
+
+                if (response.body && response.body.getReader) {
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            const trimmed = line.trim();
+                            if (!trimmed || !trimmed.startsWith('data:')) continue;
+                            const jsonStr = trimmed.replace(/^data:\s*/, '');
+                            if (jsonStr === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const delta = parsed?.choices?.[0]?.delta?.content || '';
+                                if (delta) {
+                                    fullContent += delta;
+                                    if (onChunk) onChunk(delta);
+                                }
+                            } catch (parseErr) {}
+                        }
+                    }
+                } else if (response.body && typeof response.body.on === 'function') {
+                    await new Promise((resolve, reject) => {
+                        let buffer = '';
+                        response.body.on('data', (chunk) => {
+                            buffer += chunk.toString();
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+
+                            for (const line of lines) {
+                                const trimmed = line.trim();
+                                if (!trimmed || !trimmed.startsWith('data:')) continue;
+                                const jsonStr = trimmed.replace(/^data:\s*/, '');
+                                if (jsonStr === '[DONE]') continue;
+
+                                try {
+                                    const parsed = JSON.parse(jsonStr);
+                                    const delta = parsed?.choices?.[0]?.delta?.content || '';
+                                    if (delta) {
+                                        fullContent += delta;
+                                        if (onChunk) onChunk(delta);
+                                    }
+                                } catch (parseErr) {}
+                            }
+                        });
+                        response.body.on('end', () => resolve());
+                        response.body.on('error', (err) => reject(err));
+                    });
+                } else {
+                    // Fallback to json text
+                    const data = await response.json();
+                    fullContent = data?.choices?.[0]?.message?.content || '';
+                    if (onChunk && fullContent) onChunk(fullContent);
+                }
+
+                return fullContent;
+            } catch (err) {
+                lastError = err;
+                if (err.status && isRetryableError(err.status) && attempt < MAX_RETRIES) {
+                    const delay = getRetryDelay(attempt);
+                    await sleep(delay);
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+
+    throw lastError;
+};
+
 module.exports = {
     handleChat,
+    callOpenRouter,
+    streamOpenRouter,
     detectRisk,
     getRiskTier,
     getRiskLevelFromTier,
     generatePatientReportMock,
     cleanOutput,
-    buildSystemPrompt
+    buildSystemPrompt,
+    checkApiKey,
+    sanitizeHistoryForOpenRouter
 };

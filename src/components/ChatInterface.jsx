@@ -237,13 +237,16 @@ const ChatInterface = () => {
 
     const handleSend = async (e) => {
         e.preventDefault();
-        if (!input.trim() || isCrisis || escalationStatus?.is_chat_locked) return;
+        if (!input.trim() || isCrisis) return;
 
         const userMsg = { id: Date.now(), text: input, sender: 'user', timestamp: new Date() };
         const currentInput = input;
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setIsTyping(true);
+
+        const aiMsgId = Date.now() + 1;
+        let aiCreated = false;
 
         try {
             const token = localStorage.getItem('serene_token');
@@ -252,47 +255,131 @@ const ChatInterface = () => {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ message: currentInput, history: historyForApi, sessionId: activeSessionId })
+                body: JSON.stringify({ 
+                    message: currentInput, 
+                    history: historyForApi, 
+                    sessionId: activeSessionId,
+                    stream: true 
+                })
             });
-            const data = await response.json();
-            
-            setIsTyping(false);
-            
-            if (data.isCrisis) {
-                setIsCrisis(true);
-            }
 
-            // Update escalation status
-            if (data.escalationStatus) {
-                setEscalationStatus(data.escalationStatus);
-                if (data.escalationStatus.is_chat_locked) {
-                    setShowBookingModal(true);
+            const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('text/event-stream') && response.body) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulatedText = '';
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed.startsWith('data:')) continue;
+                        const jsonStr = trimmed.replace(/^data:\s*/, '');
+                        if (!jsonStr) continue;
+
+                        try {
+                            const parsed = JSON.parse(jsonStr);
+
+                            if (parsed.chunk) {
+                                accumulatedText += parsed.chunk;
+                                setIsTyping(false);
+
+                                if (!aiCreated) {
+                                    aiCreated = true;
+                                    setMessages(prev => [...prev, {
+                                        id: aiMsgId,
+                                        text: accumulatedText,
+                                        sender: 'ai',
+                                        timestamp: new Date(),
+                                        isCrisisNote: false
+                                    }]);
+                                } else {
+                                    setMessages(prev => prev.map(msg => 
+                                        msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                                    ));
+                                }
+                            }
+
+                            if (parsed.done) {
+                                setIsTyping(false);
+                                const finalText = parsed.reply || accumulatedText;
+                                
+                                if (!aiCreated) {
+                                    setMessages(prev => [...prev, {
+                                        id: aiMsgId,
+                                        text: finalText,
+                                        sender: 'ai',
+                                        timestamp: new Date(),
+                                        isCrisisNote: parsed.isCrisis
+                                    }]);
+                                } else {
+                                    setMessages(prev => prev.map(msg => 
+                                        msg.id === aiMsgId ? { ...msg, text: finalText, isCrisisNote: parsed.isCrisis } : msg
+                                    ));
+                                }
+
+                                if (parsed.isCrisis) setIsCrisis(true);
+                                if (parsed.escalationStatus) {
+                                    setEscalationStatus(parsed.escalationStatus);
+                                    if (parsed.escalationStatus.is_chat_locked) setShowBookingModal(true);
+                                }
+                                if (parsed.sessionId && parsed.sessionId !== activeSessionId) {
+                                    setActiveSessionId(parsed.sessionId);
+                                    setSearchParams({ session: parsed.sessionId });
+                                    window.dispatchEvent(new Event('session-created'));
+                                }
+                                if (!parsed.isCrisis && finalText) {
+                                    speakText(finalText);
+                                }
+                            }
+                        } catch (pErr) {
+                            // ignore partial json chunk parsing
+                        }
+                    }
                 }
-                // Reset crisis flag if chat is now unlocked (e.g., after booking appointment)
-                if (!data.escalationStatus.is_chat_locked) {
-                    setIsCrisis(false);
+
+                setIsTyping(false);
+
+            } else {
+                // Non-streaming fallback
+                const data = await response.json();
+                setIsTyping(false);
+
+                if (data.isCrisis) setIsCrisis(true);
+                if (data.escalationStatus) {
+                    setEscalationStatus(data.escalationStatus);
+                    if (data.escalationStatus.is_chat_locked) setShowBookingModal(true);
                 }
-            }
 
-            const replyText = data.reply;
-            setMessages(prev => [...prev, {
-                id: Date.now(),
-                text: replyText,
-                sender: 'ai',
-                timestamp: new Date(),
-                isCrisisNote: data.isCrisis
-            }]);
+                const replyText = data.reply;
+                setMessages(prev => [...prev, {
+                    id: aiMsgId,
+                    text: replyText,
+                    sender: 'ai',
+                    timestamp: new Date(),
+                    isCrisisNote: data.isCrisis
+                }]);
 
-            if (data.sessionId && data.sessionId !== activeSessionId) {
-                setActiveSessionId(data.sessionId);
-                setSearchParams({ session: data.sessionId });
-                window.dispatchEvent(new Event('session-created'));
-            }
+                if (data.sessionId && data.sessionId !== activeSessionId) {
+                    setActiveSessionId(data.sessionId);
+                    setSearchParams({ session: data.sessionId });
+                    window.dispatchEvent(new Event('session-created'));
+                }
 
-            if (!data.isCrisis) {
-                speakText(replyText);
+                if (!data.isCrisis && replyText) {
+                    speakText(replyText);
+                }
             }
             
         } catch (error) {
