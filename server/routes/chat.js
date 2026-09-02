@@ -334,98 +334,13 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 3. Process via AI service with assessment data
         const assessment = await getUserAssessment(userId);
-        const chatHistory = sanitizeHistoryForOpenRouter(history);
-        const systemPrompt = buildSystemPrompt(assessment);
-
-        const messages = [
-            { role: 'system', content: systemPrompt },
-            ...chatHistory,
-            { role: 'user', content: message }
-        ];
-
-        // 4. Try streaming if requested
-        if (wantsStream && checkApiKey()) {
-            let accumulatedRaw = '';
-
-            try {
-                res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-                res.setHeader('Cache-Control', 'no-cache, no-transform');
-                res.setHeader('Connection', 'keep-alive');
-                res.flushHeaders?.();
-
-                await streamOpenRouter(messages, (chunk) => {
-                    accumulatedRaw += chunk;
-                    res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-                }, { maxTokens: 250, temperature: 0.6, topP: 0.9 });
-
-                const cleanedReply = cleanOutput(accumulatedRaw) || "I hear you. Tell me more about that.";
-
-                // Save to SQL DB
-                await new Promise((resolve, reject) => {
-                    db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
-                    [userId, cleanedReply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
-                    function(err) {
-                        if (err) reject(err);
-                        resolve();
-                    });
-                });
-
-                await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
-                const updatedStatus = await getOrCreateUserEscalationStatus(userId);
-                const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
-
-                res.write(`data: ${JSON.stringify({
-                    done: true,
-                    reply: cleanedReply,
-                    riskLevel: multiSignalEval.riskLevel,
-                    riskScore: multiSignalEval.riskScore,
-                    riskTier: multiSignalEval.riskLevel,
-                    interventions: recommendedInterventions,
-                    sessionId,
-                    escalationStatus: updatedStatus
-                })}\n\n`);
-                return res.end();
-            } catch (streamErr) {
-                console.warn('Stream failed, sending safe fallback via SSE:', streamErr.message);
-
-                const responseData = await handleChat(message, history, assessment);
-                
-                await new Promise((resolve, reject) => {
-                    db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
-                    [userId, responseData.reply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
-                    function(err) {
-                        if (err) reject(err);
-                        resolve();
-                    });
-                });
-
-                await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
-                const updatedStatus = await getOrCreateUserEscalationStatus(userId);
-                const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
-
-                if (res.headersSent) {
-                    res.write(`data: ${JSON.stringify({ chunk: responseData.reply })}\n\n`);
-                    res.write(`data: ${JSON.stringify({
-                        done: true,
-                        ...responseData,
-                        riskLevel: multiSignalEval.riskLevel,
-                        riskScore: multiSignalEval.riskScore,
-                        riskTier: multiSignalEval.riskLevel,
-                        interventions: recommendedInterventions,
-                        sessionId,
-                        escalationStatus: updatedStatus
-                    })}\n\n`);
-                    return res.end();
-                }
-            }
-        }
-
-        // 5. Non-streaming fallback (when stream is false or SSE wasn't initiated)
         const responseData = await handleChat(message, history, assessment);
-        
+        const cleanedReply = responseData.reply || "I hear you. Tell me more about that.";
+
+        // 4. Save to SQL DB
         await new Promise((resolve, reject) => {
             db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
-            [userId, responseData.reply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
+            [userId, cleanedReply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
             function(err) {
                 if (err) reject(err);
                 resolve();
@@ -436,19 +351,46 @@ router.post('/', verifyToken, async (req, res) => {
         const updatedStatus = await getOrCreateUserEscalationStatus(userId);
         const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
 
-        if (!res.headersSent) {
-            return res.json({ 
-                ...responseData, 
+        // 5. Stream response at ~100 tokens per second (word/token chunks every ~12ms)
+        if (wantsStream) {
+            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+
+            const tokenChunks = cleanedReply.split(/(\s+)/);
+            for (const chunk of tokenChunks) {
+                if (chunk) {
+                    res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+                    // Rate limit to ~100 tokens/sec (approx 10-12ms delay per token/word)
+                    await new Promise((resolve) => setTimeout(resolve, 12));
+                }
+            }
+
+            res.write(`data: ${JSON.stringify({
+                done: true,
+                reply: cleanedReply,
                 riskLevel: multiSignalEval.riskLevel,
                 riskScore: multiSignalEval.riskScore,
                 riskTier: multiSignalEval.riskLevel,
                 interventions: recommendedInterventions,
                 sessionId,
                 escalationStatus: updatedStatus
-            });
-        } else {
+            })}\n\n`);
             return res.end();
         }
+
+        // Non-streaming fallback
+        return res.json({ 
+            ...responseData, 
+            reply: cleanedReply,
+            riskLevel: multiSignalEval.riskLevel,
+            riskScore: multiSignalEval.riskScore,
+            riskTier: multiSignalEval.riskLevel,
+            interventions: recommendedInterventions,
+            sessionId,
+            escalationStatus: updatedStatus
+        });
     } catch (error) {
         console.error('Chat routing error:', error);
         if (!res.headersSent) {

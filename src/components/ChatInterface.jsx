@@ -271,7 +271,7 @@ const ChatInterface = () => {
             if (contentType.includes('text/event-stream') && response.body) {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let accumulatedText = '';
+                let fullStreamedText = '';
                 let buffer = '';
 
                 while (true) {
@@ -292,28 +292,29 @@ const ChatInterface = () => {
                             const parsed = JSON.parse(jsonStr);
 
                             if (parsed.chunk) {
-                                accumulatedText += parsed.chunk;
+                                fullStreamedText += parsed.chunk;
                                 setIsTyping(false);
 
                                 if (!aiCreated) {
                                     aiCreated = true;
                                     setMessages(prev => [...prev, {
                                         id: aiMsgId,
-                                        text: accumulatedText,
+                                        text: fullStreamedText,
                                         sender: 'ai',
                                         timestamp: new Date(),
-                                        isCrisisNote: false
+                                        isCrisisNote: false,
+                                        isStreaming: true
                                     }]);
                                 } else {
                                     setMessages(prev => prev.map(msg => 
-                                        msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                                        msg.id === aiMsgId ? { ...msg, text: fullStreamedText, isStreaming: true } : msg
                                     ));
                                 }
                             }
 
                             if (parsed.done) {
                                 setIsTyping(false);
-                                const finalText = parsed.reply || accumulatedText;
+                                const finalText = parsed.reply || fullStreamedText;
                                 
                                 if (!aiCreated) {
                                     setMessages(prev => [...prev, {
@@ -321,11 +322,12 @@ const ChatInterface = () => {
                                         text: finalText,
                                         sender: 'ai',
                                         timestamp: new Date(),
-                                        isCrisisNote: parsed.isCrisis
+                                        isCrisisNote: parsed.isCrisis,
+                                        isStreaming: false
                                     }]);
                                 } else {
                                     setMessages(prev => prev.map(msg => 
-                                        msg.id === aiMsgId ? { ...msg, text: finalText, isCrisisNote: parsed.isCrisis } : msg
+                                        msg.id === aiMsgId ? { ...msg, text: finalText, isCrisisNote: parsed.isCrisis, isStreaming: false } : msg
                                     ));
                                 }
 
@@ -352,7 +354,7 @@ const ChatInterface = () => {
                 setIsTyping(false);
 
             } else {
-                // Non-streaming fallback
+                // Non-streaming fallback with smooth progressive typewriter
                 const data = await response.json();
                 setIsTyping(false);
 
@@ -362,23 +364,44 @@ const ChatInterface = () => {
                     if (data.escalationStatus.is_chat_locked) setShowBookingModal(true);
                 }
 
-                const replyText = data.reply;
+                const replyText = data.reply || "I hear you. Tell me more about that.";
+                
+                // Progressive typewriter effect at ~100 tokens per second
+                const words = replyText.split(/(\s+)/);
+                let currentWordIdx = 0;
+                let displayedProgress = '';
+
                 setMessages(prev => [...prev, {
                     id: aiMsgId,
-                    text: replyText,
+                    text: '',
                     sender: 'ai',
                     timestamp: new Date(),
-                    isCrisisNote: data.isCrisis
+                    isCrisisNote: data.isCrisis,
+                    isStreaming: true
                 }]);
+
+                const typewriterTimer = setInterval(() => {
+                    if (currentWordIdx < words.length) {
+                        displayedProgress += words[currentWordIdx];
+                        currentWordIdx++;
+                        setMessages(prev => prev.map(msg => 
+                            msg.id === aiMsgId ? { ...msg, text: displayedProgress, isStreaming: true } : msg
+                        ));
+                    } else {
+                        clearInterval(typewriterTimer);
+                        setMessages(prev => prev.map(msg => 
+                            msg.id === aiMsgId ? { ...msg, text: replyText, isStreaming: false } : msg
+                        ));
+                        if (!data.isCrisis && replyText) {
+                            speakText(replyText);
+                        }
+                    }
+                }, 12); // ~100 tokens / words per second
 
                 if (data.sessionId && data.sessionId !== activeSessionId) {
                     setActiveSessionId(data.sessionId);
                     setSearchParams({ session: data.sessionId });
                     window.dispatchEvent(new Event('session-created'));
-                }
-
-                if (!data.isCrisis && replyText) {
-                    speakText(replyText);
                 }
             }
             
@@ -521,7 +544,12 @@ const ChatInterface = () => {
                                     ? 'bg-[#1B98E0] text-white rounded-tr-sm shadow-md shadow-[#1B98E0]/20' 
                                     : 'bg-white/80 border border-[#0E7C7B]/15 rounded-tl-sm text-[#0D1B2A]'
                             } ${msg.isCrisisNote ? 'border-red-500/50 bg-red-900/20' : ''}`}>
-                                <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                                <p className="leading-relaxed whitespace-pre-wrap">
+                                    {msg.text}
+                                    {msg.isStreaming && (
+                                        <span className="inline-block w-2 h-4 bg-[#0E7C7B] ml-1 animate-pulse align-middle rounded-sm shadow-sm shadow-[#0E7C7B]/40" />
+                                    )}
+                                </p>
                                 <span className={`text-[10px] mt-2 block ${msg.sender === 'user' ? 'text-white/70 font-medium' : 'text-[#3D5A80]'}`}>
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
