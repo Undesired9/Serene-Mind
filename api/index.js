@@ -1,4 +1,4 @@
-const app = require('../backend/server');
+const app = require('../server/server');
 
 module.exports = (req, res) => {
     // Normalization helper for Vercel query rewrites

@@ -6,7 +6,7 @@ This guide covers deployment procedures, environment configuration, monitoring, 
 
 ## 1. Environment Configuration
 
-### Backend (`.env`)
+### Root (`.env`)
 ```ini
 PORT=5000
 NODE_ENV=production
@@ -15,7 +15,7 @@ GEMINI_API_KEY=your_gemini_production_key
 CORS_ORIGIN=https://serenemind.app
 ```
 
-### Frontend (`frontend/.env.production`)
+### Frontend (`.env.production` at project root)
 ```ini
 VITE_API_URL=https://api.serenemind.app
 ```
@@ -49,7 +49,6 @@ The platform exposes an active health endpoint:
 ## 3. Automated Test Verification
 Before promoting to staging or production, execute the NFR test suite:
 ```bash
-cd backend
 npm test
 ```
 All automated tests must report `PASS` with exit code `0`.

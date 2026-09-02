@@ -40,20 +40,29 @@ Patient ➔ Registration / Login ➔ Consent & Privacy ➔ Structured Intake ➔
 
 ```
 Serene-Mind/
-├── backend/                  # Node.js & Express REST API Server
-│   ├── database/             # SQLite database schemas and migrations
+├── api/                      # Vercel serverless function handlers
+│   ├── index.js              # API entry point (imports server/server.js)
+│   └── [...path].js          # Catch-all route handler
+│
+├── server/                   # Node.js & Express REST API Server
+│   ├── database/             # SQLite/Turso database schemas and migrations
 │   ├── middleware/           # JWT auth and role validation guards
 │   ├── routes/               # API route modules (auth, chat, dashboard, doctor, reports, appointments)
 │   ├── services/             # Google Gemini AI and business logic services
-│   └── server.js             # API entry point (Port 5000)
+│   ├── tests/                # NFR validation test suite
+│   └── server.js             # Express app entry point (Port 5000)
 │
-├── frontend/                 # React + Vite Web Application
-│   ├── src/
-│   │   ├── components/       # Patient dashboard, chat interface, doctor portal, intake, assessment
-│   │   ├── i18n.js           # Multilingual localization (English, Spanish, Urdu)
-│   │   ├── App.jsx           # Routing & responsive layout container
-│   │   └── main.jsx
-│   └── package.json
+├── src/                      # React + Vite Web Application
+│   ├── components/           # Patient dashboard, chat interface, doctor portal, intake, assessment
+│   ├── i18n.js               # Multilingual localization (English, Spanish, Urdu)
+│   ├── App.jsx               # Routing & responsive layout container
+│   └── main.jsx
+│
+├── public/                   # Static assets (SVG icons, favicons)
+├── index.html                # Vite HTML entry point
+├── package.json              # Unified dependencies (frontend + backend)
+├── vite.config.js            # Vite build configuration
+├── vercel.json               # Vercel deployment configuration
 │
 ├── mobile/                   # React Native (Expo) Native Mobile App
 │   ├── src/
@@ -72,23 +81,24 @@ Serene-Mind/
 
 ## 🚀 Getting Started
 
-### 1. Backend Setup
+### 1. Install Dependencies
 ```bash
-cd backend
 npm install
-node server.js
+```
+
+### 2. Start the Backend Server
+```bash
+npm start
 ```
 *Runs on `http://localhost:5000`*
 
-### 2. Frontend Web App
+### 3. Start the Frontend Dev Server
 ```bash
-cd frontend
-npm install
 npm run dev
 ```
-*Runs on `http://localhost:5173`*
+*Runs on `http://localhost:5173` with API proxy to the backend*
 
-### 3. Mobile App (Expo)
+### 4. Mobile App (Expo)
 ```bash
 cd mobile
 npm install

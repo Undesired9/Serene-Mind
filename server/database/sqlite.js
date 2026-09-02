@@ -1,7 +1,7 @@
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@libsql/client');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const dbPath = path.resolve(__dirname, 'serenemind.db');
 const tursoUrl = process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.trim() : '';

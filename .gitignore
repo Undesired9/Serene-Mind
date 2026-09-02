@@ -1,21 +1,20 @@
 # Dependencies
 node_modules/
 
-# Environment files (tracking explicitly permitted as requested)
-
+# Environment files
+.env
 
 # API keys / credentials
-backend/kaggle.json
+server/kaggle.json
 *.kaggle.json
 
 # Databases
-backend/database/*.db
-backend/database/*.db-journal
-backend/database/*.db-wal
-backend/database/*.db-shm
+server/database/*.db
+server/database/*.db-journal
+server/database/*.db-wal
+server/database/*.db-shm
 
 # Build output
-frontend/dist/
 dist/
 
 # Logs
