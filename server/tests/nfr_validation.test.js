@@ -150,6 +150,21 @@ It sounds like everything is feeling overwhelming right now. Take a gentle breat
     assert(cleaned.startsWith("It sounds like"), "Must retain clean therapeutic text");
 });
 
+test('NFR-AI-3: Must extract quoted therapist speech from meta-thinking paragraphs', () => {
+    const { cleanOutput } = require('../services/aiService');
+    const rawMetaText = `The user repeated "my fiance cheated on me". This is the second time they said it. Previously they said "i am so depresses". Now they disclosed the reason: fiancé cheated. This is a huge betrayal, likely causing the depression/anxiety. I need to respond with empathy, validate, and keep the conversation going.
+
+I need to output therapist words only, no meta. Speak directly to client. Use person-centered and CBT gently. Validate emotion. Ask one open-ended question or offer reflection.
+
+I'll respond: "I'm so deeply sorry you're going through this devastating betrayal. It makes complete sense you'd feel heartbroken, angry, and utterly confused. How are you taking care of yourself right now, and who has been supporting you through this incredibly painful time?"`;
+
+    const cleaned = cleanOutput(rawMetaText);
+    assert(!cleaned.includes("The user repeated"), "Must strip third-person meta paragraph");
+    assert(!cleaned.includes("I need to output"), "Must strip internal rules paragraph");
+    assert(!cleaned.includes("I'll respond:"), "Must strip I'll respond prefix");
+    assert(cleaned.startsWith("I'm so deeply sorry you're going through this devastating betrayal"), "Must extract direct spoken therapist words");
+});
+
 console.log(`\n📊 Test Run Summary: ${passed} passed, ${failed} failed.\n`);
 
 if (failed > 0) {

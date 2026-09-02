@@ -20,11 +20,14 @@ const MEDIUM_RISK_KEYWORDS = [
 const FAST_FREE_MODELS = [
     'google/gemini-2.0-flash-lite-preview:free',
     'meta-llama/llama-3.3-70b-instruct:free',
-    'nvidia/nemotron-3.5-lightning:free',
-    'mistralai/mistral-7b-instruct:free'
+    'qwen/qwen-2.5-72b-instruct:free',
+    'mistralai/mistral-small-24b-instruct-2501:free',
+    'meta-llama/llama-3.1-8b-instruct:free'
 ];
 
-const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || FAST_FREE_MODELS[0];
+// If env specifies nemotron, use gemini-flash instead to prevent chain-of-thought leakage
+const envModel = process.env.OPENROUTER_MODEL;
+const PRIMARY_MODEL = (envModel && !envModel.includes('nemotron')) ? envModel : FAST_FREE_MODELS[0];
 const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2));
 const BASE_RETRY_DELAY_MS = Math.max(150, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 400));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -126,30 +129,60 @@ Keep this clinical context in mind to tailor your empathy, without explicitly ci
 
 const cleanOutput = (text) => {
     if (!text || typeof text !== 'string') return '';
-    let cleaned = text;
+    let cleaned = text.trim();
 
     // 1. Strip explicit <think>...</think> XML blocks
-    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-    // 2. Strip "Here's a thinking process:" / "Thinking Process:" blocks and any following bullet points
-    cleaned = cleaned.replace(/(?:here(?:'s| is) (?:a |the )?(?:thinking|thought) process|thinking process|thought process):?[\s\S]*?(?=\n\s*\n\s*[A-Za-z"']|\n\s*\n\s*\*\*|$)/gi, '');
-
-    // 3. Strip any leading or isolated reasoning bullet points (e.g. lines starting with "- User:", "* User:", "- Language:", "- Tone:")
-    cleaned = cleaned.replace(/(?:^|\n)[-*•]\s*(?:User|Language|Tone|Intent|Response|Therapeutic|Goal|Emotional|State|Observation|Plan)[^\n]*/gi, '');
-
-    // 4. If the text still contains separate paragraphs and the first paragraph is an outline/analysis, grab the conversational text
-    const paragraphs = cleaned.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-    if (paragraphs.length > 1 && (paragraphs[0].startsWith('-') || paragraphs[0].startsWith('*') || /thinking process/i.test(paragraphs[0]))) {
-        const directReply = paragraphs.find(p => !p.startsWith('-') && !p.startsWith('*') && !/thinking process/i.test(p) && p.length > 15);
-        if (directReply) {
-            cleaned = directReply;
-        }
+    // 2. Check if the model wrapped its final response in a spoken quote (e.g. I'll respond: "...")
+    const quoteMatch = cleaned.match(/(?:I'll respond|I will respond|My response|Therapist response|Spoken response|Suggested response):\s*["“]([\s\S]+?)["”](?:\s*$)/i);
+    if (quoteMatch && quoteMatch[1] && quoteMatch[1].trim().length > 10) {
+        return quoteMatch[1].trim();
     }
 
-    // 5. Strip persona prefixes (e.g. "SereneMind:", "Therapist:", "AI:")
+    const unquotedMatch = cleaned.match(/(?:I'll respond|I will respond|My response|Therapist response|Spoken response|Suggested response):\s*([\s\S]+$)/i);
+    if (unquotedMatch && unquotedMatch[1] && unquotedMatch[1].trim().length > 10) {
+        cleaned = unquotedMatch[1].trim().replace(/^["“]|["”]$/g, '');
+    }
+
+    // 3. Strip "Here's a thinking process:" / "Thinking Process:" blocks
+    cleaned = cleaned.replace(/(?:here(?:'s| is) (?:a |the )?(?:thinking|thought) process|thinking process|thought process):?[\s\S]*?(?=\n\s*\n\s*[A-Za-z"']|\n\s*\n\s*\*\*|$)/gi, '');
+
+    // 4. Strip meta-reasoning bullet points
+    cleaned = cleaned.replace(/(?:^|\n)[-*•]\s*(?:User|Language|Tone|Intent|Response|Therapeutic|Goal|Emotional|State|Observation|Plan)[^\n]*/gi, '');
+
+    // 5. Filter out paragraphs containing third-person analysis
+    const isMetaParagraph = (p) => {
+        const lower = p.toLowerCase();
+        return (
+            lower.startsWith('the user ') ||
+            lower.startsWith('the client ') ||
+            lower.startsWith('the speaker ') ||
+            lower.startsWith('user says') ||
+            lower.startsWith('user repeated') ||
+            lower.startsWith('user states') ||
+            lower.startsWith('i need to ') ||
+            lower.startsWith('i should ') ||
+            lower.startsWith('i must ') ||
+            lower.startsWith('plan:') ||
+            lower.startsWith('thinking:') ||
+            lower.startsWith('thought:') ||
+            lower.startsWith('- ') ||
+            lower.startsWith('* ')
+        );
+    };
+
+    const paragraphs = cleaned.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    const validParagraphs = paragraphs.filter(p => !isMetaParagraph(p));
+
+    if (validParagraphs.length > 0) {
+        cleaned = validParagraphs.join('\n\n');
+    }
+
+    // 6. Strip persona prefixes (e.g. "SereneMind:", "Therapist:", "AI:")
     cleaned = cleaned.replace(/^(?:SereneMind|Counselor|Counselor AI|Therapist|AI|System)\s*:\s*/i, '');
 
-    // 6. Strip numbered lists if any were accidentally produced
+    // 7. Strip numbered lists
     cleaned = cleaned.replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '');
 
     return cleaned.trim();
