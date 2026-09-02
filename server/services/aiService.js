@@ -17,9 +17,16 @@ const MEDIUM_RISK_KEYWORDS = [
     'sad', 'stressed', 'worried', 'upset', 'frustrated', 'angry', 'tired'
 ];
 
-const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
+const FAST_FREE_MODELS = [
+    'google/gemini-2.0-flash-lite-preview:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'nvidia/nemotron-3.5-lightning:free',
+    'mistralai/mistral-7b-instruct:free'
+];
+
+const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || FAST_FREE_MODELS[0];
 const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2));
-const BASE_RETRY_DELAY_MS = Math.max(200, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 700));
+const BASE_RETRY_DELAY_MS = Math.max(150, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 400));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 let apiKeyAvailable = false;
@@ -31,7 +38,6 @@ function checkApiKey() {
         return false;
     }
     apiKeyAvailable = true;
-    console.log("✅ OpenRouter API key found");
     return true;
 }
 
@@ -101,7 +107,7 @@ CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
 5. LANGUAGE: Respond in the exact same language or dialect the client is writing in (English, Urdu, etc.).
 
 CRISIS PROTOCOL:
-- If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines.`;
+- If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines (Umang 0311-7786264, Rescue 1122).`;
 
     if (assessment) {
         prompt += `
@@ -165,11 +171,10 @@ const isRetryableError = (status) => {
 };
 
 const getRetryDelay = (attempt) =>
-    BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
+    BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 150);
 
 /**
- * Call OpenRouter API with the given messages.
- * Uses the OpenAI-compatible chat completions endpoint.
+ * Call OpenRouter API with the given messages and fallback models.
  */
 const callOpenRouter = async (messages, options = {}) => {
     const apiKey = process.env.serenemind;
@@ -179,69 +184,71 @@ const callOpenRouter = async (messages, options = {}) => {
 
     const {
         model = PRIMARY_MODEL,
-        maxTokens = 1000,
-        temperature = 0.7,
+        maxTokens = 250,
+        temperature = 0.6,
         topP = 0.9
     } = options;
 
+    const candidateModels = Array.from(new Set([
+        model,
+        ...FAST_FREE_MODELS
+    ]));
+
     let lastError;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const response = await fetch(OPENROUTER_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://serenemind.vercel.app',
-                    'X-Title': 'SereneMind'
-                },
-                body: JSON.stringify({
-                    model,
-                    messages,
-                    max_tokens: maxTokens,
-                    temperature,
-                    top_p: topP
-                })
-            });
+    for (const currentModel of candidateModels) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await fetch(OPENROUTER_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://serenemind.vercel.app',
+                        'X-Title': 'SereneMind'
+                    },
+                    body: JSON.stringify({
+                        model: currentModel,
+                        messages,
+                        max_tokens: maxTokens,
+                        temperature,
+                        top_p: topP
+                    })
+                });
 
-            if (!response.ok) {
-                const errorBody = await response.text().catch(() => 'Unknown error');
-                const error = new Error(`OpenRouter API error: ${response.status} - ${errorBody}`);
-                error.status = response.status;
+                if (!response.ok) {
+                    const errorBody = await response.text().catch(() => 'Unknown error');
+                    const error = new Error(`OpenRouter API error (${currentModel}): ${response.status} - ${errorBody}`);
+                    error.status = response.status;
 
-                if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
+                    if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
+                        const delay = getRetryDelay(attempt);
+                        await sleep(delay);
+                        continue;
+                    }
+
+                    // Try next model candidate
+                    lastError = error;
+                    break;
+                }
+
+                const data = await response.json();
+                const content = data?.choices?.[0]?.message?.content;
+
+                if (!content) {
+                    throw new Error(`No content in OpenRouter response from ${currentModel}`);
+                }
+
+                return content;
+            } catch (error) {
+                lastError = error;
+
+                if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
                     const delay = getRetryDelay(attempt);
-                    console.warn(`OpenRouter request failed (attempt ${attempt + 1}). Retrying in ${delay}ms...`, {
-                        status: response.status
-                    });
                     await sleep(delay);
                     continue;
                 }
-
-                throw error;
-            }
-
-            const data = await response.json();
-            const content = data?.choices?.[0]?.message?.content;
-
-            if (!content) {
-                throw new Error('No content in OpenRouter response');
-            }
-
-            return content;
-        } catch (error) {
-            lastError = error;
-
-            if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
-                const delay = getRetryDelay(attempt);
-                console.warn(`OpenRouter request failed (attempt ${attempt + 1}). Retrying in ${delay}ms...`);
-                await sleep(delay);
-                continue;
-            }
-
-            if (attempt >= MAX_RETRIES) {
-                throw error;
+                break;
             }
         }
     }
