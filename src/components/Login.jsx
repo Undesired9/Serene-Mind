@@ -298,7 +298,7 @@ const Login = () => {
                         disabled={loading}
                         className="w-full bg-[#1B98E0] hover:bg-[#1689C9] text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-[#1B98E0]/20 mt-2 flex justify-center items-center"
                     >
-                        {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent flex rounded-full animate-spin"></div> : (isRegister ? 'Start Your Journey' : 'Sign In')}
+                        {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent flex rounded-full animate-spin"></div> : (isRegister ? 'Start Your Journey' : 'Login')}
                     </button>
                 </form>
 
