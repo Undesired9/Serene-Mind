@@ -613,8 +613,8 @@ router.post('/assessment', verifyToken, async (req, res) => {
     const sql = `
         INSERT INTO Assessments (
             user_id, answers, depression_score, anxiety_score, stress_score, 
-            total_score, main_concern, self_harm_risk
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            total_score, main_concern, self_harm_risk, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(user_id) DO UPDATE SET
             answers = excluded.answers,
             depression_score = excluded.depression_score,
@@ -637,16 +637,16 @@ router.post('/assessment', verifyToken, async (req, res) => {
         selfHarmRisk ? 1 : 0
     ];
 
-    db.run(sql, params, async function(err) {
-        if (err) {
-            console.error('Assessment insert error:', err);
-            return res.status(500).json({ error: 'Failed to save assessment.' });
-        }
+    try {
+        await runStatement(sql, params);
 
         // Record Safety Screening
         if (selfHarmRisk) {
-            db.run(`INSERT INTO Safety_Screenings (user_id, trigger_source, self_harm_flag, suicide_ideation_flag, crisis_details, escalation_status)
-                    VALUES (?, 'ASSESSMENT', 1, 1, 'Self-harm or crisis flag active on screening questionnaire', 'ESCALATED')`, [userId]);
+            await runStatement(
+                `INSERT INTO Safety_Screenings (user_id, trigger_source, self_harm_flag, suicide_ideation_flag, crisis_details, escalation_status)
+                 VALUES (?, 'ASSESSMENT', 1, 1, 'Self-harm or crisis flag active on screening questionnaire', 'ESCALATED')`,
+                [userId]
+            ).catch(e => console.warn('Safety screening log error:', e.message));
             logAuditEvent('SAFETY_SCREEN_COMPLETED', userId, userId, 'PATIENT', { flag: 'POSITIVE' });
         } else {
             logAuditEvent('SAFETY_SCREEN_COMPLETED', userId, userId, 'PATIENT', { flag: 'NEGATIVE' });
@@ -656,9 +656,14 @@ router.post('/assessment', verifyToken, async (req, res) => {
         logAuditEvent('GAD7_COMPLETED', userId, userId, 'PATIENT', { score: gad });
 
         // Trigger Multi-Signal Risk Engine
-        const riskEvaluation = await evaluateMultiSignalRisk(userId);
+        let riskEvaluation = null;
+        try {
+            riskEvaluation = await evaluateMultiSignalRisk(userId);
+        } catch (riskErr) {
+            console.warn('Risk engine non-blocking error:', riskErr.message);
+        }
 
-        res.status(201).json({ 
+        return res.status(201).json({ 
             message: 'Assessment saved successfully',
             riskEvaluation,
             user: {
@@ -666,7 +671,10 @@ router.post('/assessment', verifyToken, async (req, res) => {
                 needsAssessment: false
             }
         });
-    });
+    } catch (err) {
+        console.error('Assessment insert error:', err);
+        return res.status(500).json({ error: 'Failed to save assessment. Please try again.' });
+    }
 });
 
 module.exports = router;

@@ -140,17 +140,22 @@ const Assessment = () => {
             // Update user in localStorage to bypass protector
             const userStr = localStorage.getItem('serene_user');
             if (userStr) {
-                const user = JSON.parse(userStr);
-                user.needsAssessment = false;
-                localStorage.setItem('serene_user', JSON.stringify(user));
+                try {
+                    const user = JSON.parse(userStr);
+                    user.needsAssessment = false;
+                    localStorage.setItem('serene_user', JSON.stringify(user));
+                } catch (parseErr) {
+                    console.warn('Could not update user localStorage:', parseErr);
+                }
             }
             
             setResults(computedResults);
             setStep(22); // results state
 
         } catch (err) {
-            setError(err.message);
-            setStep(20); // let them try submitting again from the last question
+            console.error('Assessment submission error:', err);
+            setError(err.message || 'Connection or calibration error. Please click Retry below.');
+            setStep(20); // return to last question view with error banner & retry button
         }
     };
 
