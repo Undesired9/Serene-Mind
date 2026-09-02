@@ -105,8 +105,8 @@ const MainLayout = ({ children }) => {
         {/* Phase 0 Emergency Crisis Bar */}
         <div className="bg-[#0D1B2A] text-white px-4 py-1.5 text-xs flex items-center justify-between shadow-sm z-10">
           <div className="flex items-center gap-2">
-            <span className="bg-red-500 text-white font-bold px-1.5 py-0.5 rounded text-[10px]">24/7 CRISIS</span>
-            <span className="text-gray-200">If you are in immediate distress, call or text the Suicide & Crisis Lifeline at <strong className="text-[#C2FFF0]">988</strong></span>
+            <span className="bg-red-500 text-white font-bold px-1.5 py-0.5 rounded text-[10px]">24/7 CRISIS HELPLINE</span>
+            <span className="text-gray-200">If you are in immediate distress, call Umang Mental Health at <a href="tel:03117786264" className="text-[#C2FFF0] font-bold underline">0311-7786264</a> or Rescue <a href="tel:1122" className="text-[#C2FFF0] font-bold underline">1122</a></span>
           </div>
           <span className="hidden md:inline text-gray-400 text-[11px]">Non-Diagnostic AI Support</span>
         </div>

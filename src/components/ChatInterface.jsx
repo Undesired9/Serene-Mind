@@ -392,8 +392,9 @@ const ChatInterface = () => {
                                     Our system has detected language indicating elevated risk. Please contact emergency services immediately.
                                     We are escalating this session to our human medical review team.
                                 </p>
-                                <div className="flex gap-4 mt-3">
-                                    <a href="tel:988" className="bg-red-500 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-red-600 transition shadow-lg shadow-red-500/20 text-sm">Call 988 (Crisis Hotline)</a>
+                                <div className="flex flex-wrap gap-3 mt-3">
+                                    <a href="tel:03117786264" className="bg-red-500 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-red-600 transition shadow-lg shadow-red-500/20 text-sm">Call Umang (0311-7786264)</a>
+                                    <a href="tel:1122" className="bg-red-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-red-700 transition text-sm">Call Rescue 1122</a>
                                     <button onClick={() => setShowBookingModal(true)} className="bg-white/10 text-red-100 font-medium py-1.5 px-4 rounded-lg hover:bg-white/20 transition text-sm">Book Urgent Session</button>
                                 </div>
                             </div>

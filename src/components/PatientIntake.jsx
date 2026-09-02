@@ -390,7 +390,7 @@ const PatientIntake = () => {
                                         type="tel"
                                         value={formData.phoneNumber}
                                         onChange={(e) => handleChange('phoneNumber', e.target.value)}
-                                        placeholder="e.g. +1 555-0199"
+                                        placeholder="e.g. 0300-1234567 or +92 300 1234567"
                                         minLength={7}
                                         maxLength={16}
                                         className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
@@ -433,7 +433,7 @@ const PatientIntake = () => {
                                             type="tel"
                                             value={formData.emergencyContactPhone}
                                             onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
-                                            placeholder="e.g. +1 555-0188"
+                                            placeholder="e.g. 0312-3456789"
                                             minLength={7}
                                             maxLength={16}
                                             className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"

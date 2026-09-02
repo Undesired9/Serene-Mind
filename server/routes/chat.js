@@ -272,7 +272,7 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 2. If Critical Risk flagged, send safe crisis fallback immediately
         if (isCritical) {
-            const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the 988 Suicide & Crisis Lifeline (call/text 988) or reach out to emergency services immediately. You do not have to carry this alone.";
+            const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the Umang Pakistan Mental Health Helpline (call 0311-7786264), call Rescue 1122, or reach out to a trusted loved one or emergency doctor immediately. You do not have to carry this alone.";
             
             await new Promise((resolve, reject) => {
                 db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, 'CRITICAL', 95, ?)`, 

@@ -244,16 +244,34 @@ const Assessment = () => {
                     </div>
 
                     {results.selfHarmRisk && (
-                        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-xl mb-6">
+                        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-2xl mb-6 shadow-sm">
                             <h3 className="text-red-700 font-bold text-lg mb-2 flex items-center gap-2">
-                                ⚠️ Critical Warning
+                                ⚠️ Critical Support & Safety Alert
                             </h3>
-                            <p className="text-red-700 mb-2 font-medium">
-                                Your response suggests possible self-harm thoughts. Please seek immediate support from a trusted person, emergency services, or a mental health professional.
+                            <p className="text-red-700 mb-3 font-medium leading-relaxed text-sm">
+                                Your response suggests possible self-harm thoughts or elevated distress. Please seek immediate support from a trusted person, emergency services, or a mental health professional.
                             </p>
-                            <p className="text-red-600 text-sm">
-                                If you are in the U.S., call or text 988 for crisis support. If you are outside the U.S., contact your local emergency number or crisis helpline.
-                            </p>
+                            <div className="bg-white/90 rounded-xl p-4 border border-red-200 text-sm space-y-2 text-[#0D1B2A]">
+                                <p className="font-bold text-red-800 text-xs uppercase tracking-wider">Pakistan Crisis Helplines & Emergency Services:</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+                                    <a href="tel:03117786264" className="flex items-center justify-between p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-900 font-semibold transition border border-red-100">
+                                        <span>Umang Mental Health:</span>
+                                        <span className="font-bold text-red-600">0311-7786264</span>
+                                    </a>
+                                    <a href="tel:1122" className="flex items-center justify-between p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-900 font-semibold transition border border-red-100">
+                                        <span>National Emergency:</span>
+                                        <span className="font-bold text-red-600">Rescue 1122</span>
+                                    </a>
+                                    <a href="tel:03041111741" className="flex items-center justify-between p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-900 font-semibold transition border border-red-100">
+                                        <span>Rozan Counseling:</span>
+                                        <span className="font-bold text-red-600">0304-1111741</span>
+                                    </a>
+                                    <a href="tel:03168275336" className="flex items-center justify-between p-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-900 font-semibold transition border border-red-100">
+                                        <span>Taskeen Helpline:</span>
+                                        <span className="font-bold text-red-600">0316-8275336</span>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     )}
 
