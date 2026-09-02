@@ -132,42 +132,50 @@ const validateIntakePayload = (payload, accountEmail = '') => {
     const presentingProblem = normalizeText(payload.presentingProblem);
     const treatmentGoals = normalizeText(payload.treatmentGoals);
 
-    if (!PERSON_NAME_PATTERN.test(fullLegalName)) return 'Enter a valid full legal name';
-    if (preferredName && !PERSON_NAME_PATTERN.test(preferredName)) return 'Enter a valid preferred name';
+    // Required fields: Full Name, Date of Birth, Presenting Problem
+    if (!fullLegalName || fullLegalName.length < 2) return 'Full legal name is required (at least 2 characters)';
+    if (!PERSON_NAME_PATTERN.test(fullLegalName)) return 'Please enter a valid full legal name';
 
     if (!payload.dateOfBirth) return 'Date of birth is required';
-
     const dob = new Date(payload.dateOfBirth);
     const now = new Date();
     const age = now.getFullYear() - dob.getFullYear() - (
         now.getMonth() < dob.getMonth() ||
         (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0
     );
-
     if (Number.isNaN(dob.getTime()) || payload.dateOfBirth > new Date().toISOString().split('T')[0] || age < 5 || age > 120) {
-        return 'Enter a valid date of birth';
+        return 'Please enter a valid date of birth (age 5-120)';
     }
 
-    if (!PHONE_PATTERN.test(phoneNumber)) return 'Enter a valid phone number';
-    if (!emailAddress || validateEmail(emailAddress)) return 'Enter a valid email address';
-    if (accountEmail && emailAddress !== normalizeEmail(accountEmail)) {
-        return 'The intake email must match the email on your account';
+    if (!presentingProblem || presentingProblem.length < 3) {
+        return 'Please describe your main concerns or symptoms (at least 3 characters)';
     }
 
+    // Optional fields validated only if provided
+    if (preferredName && !PERSON_NAME_PATTERN.test(preferredName)) {
+        return 'Enter a valid preferred name';
+    }
+    if (phoneNumber && !PHONE_PATTERN.test(phoneNumber)) {
+        return 'Enter a valid phone number (e.g. +1234567890)';
+    }
+    if (emailAddress && validateEmail(emailAddress)) {
+        return 'Enter a valid email address';
+    }
     if (nationalId && !NATIONAL_ID_PATTERN.test(nationalId)) {
-        return 'National ID must be 4-30 letters, numbers, slashes, or hyphens';
+        return 'National ID must be 4-30 characters (letters, numbers, slashes, or hyphens)';
     }
-
-    if (!PERSON_NAME_PATTERN.test(emergencyContactName)) return 'Enter a valid emergency contact name';
+    if (emergencyContactName && !PERSON_NAME_PATTERN.test(emergencyContactName)) {
+        return 'Enter a valid emergency contact name';
+    }
     if (emergencyContactRelationship && !GENERIC_TEXT_PATTERN.test(emergencyContactRelationship)) {
         return 'Enter a valid emergency contact relationship';
     }
-    if (!PHONE_PATTERN.test(emergencyContactPhone)) return 'Enter a valid emergency contact phone number';
+    if (emergencyContactPhone && !PHONE_PATTERN.test(emergencyContactPhone)) {
+        return 'Enter a valid emergency contact phone number';
+    }
     if (emergencyContactAltPhone && !PHONE_PATTERN.test(emergencyContactAltPhone)) {
         return 'Enter a valid alternative contact phone number';
     }
-    if (presentingProblem.length < 10) return 'Main concerns or symptoms should be at least 10 characters';
-    if (treatmentGoals.length < 10) return 'Treatment goals should be at least 10 characters';
 
     return '';
 };

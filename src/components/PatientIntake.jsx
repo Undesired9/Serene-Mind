@@ -18,34 +18,34 @@ const intakeSections = [
         description: 'Name, birth date, and contact details.',
         fields: [
             { key: 'fullLegalName', label: 'Full legal name', required: true, placeholder: 'Enter full legal name' },
-            { key: 'preferredName', label: 'Preferred name', placeholder: 'Preferred name or nickname' },
+            { key: 'preferredName', label: 'Preferred name', placeholder: 'Preferred name or nickname (optional)' },
             { key: 'dateOfBirth', label: 'Date of birth', type: 'date', required: true },
-            { key: 'genderSex', label: 'Gender/sex', placeholder: 'Gender or sex, if relevant' },
+            { key: 'genderSex', label: 'Gender/sex', placeholder: 'Gender or sex, if relevant (optional)' },
             { key: 'nationalId', label: 'National ID or patient ID number', placeholder: 'Optional ID number' },
-            { key: 'maritalStatus', label: 'Marital status', placeholder: 'Single, married, divorced, etc.' },
-            { key: 'occupation', label: 'Occupation', placeholder: 'Current occupation' },
-            { key: 'educationLevel', label: 'Education level', placeholder: 'Highest completed level' },
-            { key: 'address', label: 'Address', type: 'textarea', placeholder: 'Current residential address' },
-            { key: 'phoneNumber', label: 'Phone number', type: 'tel', required: true, placeholder: 'Primary phone number' },
-            { key: 'emailAddress', label: 'Email address', type: 'email', required: true, placeholder: 'Patient email address' }
+            { key: 'maritalStatus', label: 'Marital status', placeholder: 'Single, married, divorced, etc. (optional)' },
+            { key: 'occupation', label: 'Occupation', placeholder: 'Current occupation (optional)' },
+            { key: 'educationLevel', label: 'Education level', placeholder: 'Highest completed level (optional)' },
+            { key: 'address', label: 'Address', type: 'textarea', placeholder: 'Current residential address (optional)' },
+            { key: 'phoneNumber', label: 'Phone number', type: 'tel', placeholder: 'Primary phone number (optional)' },
+            { key: 'emailAddress', label: 'Email address', type: 'email', placeholder: 'Patient email address (optional)' }
         ]
     },
     {
         title: 'Support contact',
         shortTitle: 'Support',
-        description: 'Who we should contact in an urgent situation.',
+        description: 'Who we should contact in an urgent situation (optional).',
         fields: [
-            { key: 'emergencyContactName', label: 'Name', required: true, placeholder: 'Emergency contact full name' },
-            { key: 'emergencyContactRelationship', label: 'Relationship to patient', placeholder: 'Parent, spouse, sibling, friend, etc.' },
-            { key: 'emergencyContactPhone', label: 'Phone number', type: 'tel', required: true, placeholder: 'Primary emergency contact number' },
-            { key: 'emergencyContactAltPhone', label: 'Alternative contact number', type: 'tel', placeholder: 'Backup contact number' },
+            { key: 'emergencyContactName', label: 'Name', placeholder: 'Emergency contact full name (optional)' },
+            { key: 'emergencyContactRelationship', label: 'Relationship to patient', placeholder: 'Parent, spouse, sibling, friend, etc. (optional)' },
+            { key: 'emergencyContactPhone', label: 'Phone number', type: 'tel', placeholder: 'Primary emergency contact number (optional)' },
+            { key: 'emergencyContactAltPhone', label: 'Alternative contact number', type: 'tel', placeholder: 'Backup contact number (optional)' },
             { key: 'emergencyContactAddress', label: 'Address (optional)', type: 'textarea', placeholder: 'Emergency contact address if relevant' }
         ]
     },
     {
         title: 'How you found us',
         shortTitle: 'Referral',
-        description: 'How you heard about the service.',
+        description: 'How you heard about the service (optional).',
         fields: [
             { key: 'referralSource', label: 'How the patient heard about your service', placeholder: 'Self-referral, friend, website, clinic, etc.' },
             { key: 'referringProvider', label: 'Referring physician, therapist, or organization', placeholder: 'Name of provider or organization' },
@@ -57,11 +57,11 @@ const intakeSections = [
         shortTitle: 'Current concern',
         description: 'Your main concerns and what you want help with.',
         fields: [
-            { key: 'presentingProblem', label: 'Main concerns or symptoms', type: 'textarea', required: true, placeholder: 'Describe the patient\'s main symptoms or concerns' },
-            { key: 'symptomDuration', label: 'Duration of symptoms', placeholder: 'How long symptoms have been present' },
-            { key: 'symptomSeverity', label: 'Severity of symptoms', placeholder: 'Mild, moderate, severe, fluctuating, etc.' },
-            { key: 'seekingHelpReason', label: 'What prompted seeking help now', type: 'textarea', placeholder: 'What changed recently or triggered help-seeking' },
-            { key: 'treatmentGoals', label: 'Patient goals for treatment', type: 'textarea', required: true, placeholder: 'What the patient hopes to improve or achieve' }
+            { key: 'presentingProblem', label: 'Main concerns or symptoms', type: 'textarea', required: true, placeholder: 'Describe what brings you in or symptoms you are experiencing' },
+            { key: 'symptomDuration', label: 'Duration of symptoms', placeholder: 'How long symptoms have been present (optional)' },
+            { key: 'symptomSeverity', label: 'Severity of symptoms', placeholder: 'Mild, moderate, severe, fluctuating, etc. (optional)' },
+            { key: 'seekingHelpReason', label: 'What prompted seeking help now', type: 'textarea', placeholder: 'What changed recently or triggered help-seeking (optional)' },
+            { key: 'treatmentGoals', label: 'Patient goals for treatment', type: 'textarea', placeholder: 'What you hope to improve or achieve (optional)' }
         ]
     },
     {
@@ -136,16 +136,15 @@ const initialFormState = intakeSections.flatMap((section) => section.fields).red
 }, {});
 
 const validateIntakeForm = (formData, accountEmail = '') => {
-    const normalize = (value) => value.trim();
-    const normalizedEmail = normalize(formData.emailAddress).toLowerCase();
-    const normalizedAccountEmail = normalize(accountEmail).toLowerCase();
+    const normalize = (value) => String(value || '').trim();
 
-    if (!NAME_PATTERN.test(normalize(formData.fullLegalName))) {
-        return 'Enter a valid full legal name';
+    // Required fields: Full Legal Name, Date of Birth, Presenting Problem
+    if (!normalize(formData.fullLegalName) || normalize(formData.fullLegalName).length < 2) {
+        return 'Full legal name is required (at least 2 characters)';
     }
 
-    if (formData.preferredName && !NAME_PATTERN.test(normalize(formData.preferredName))) {
-        return 'Enter a valid preferred name';
+    if (!NAME_PATTERN.test(normalize(formData.fullLegalName))) {
+        return 'Please enter a valid full legal name';
     }
 
     if (!formData.dateOfBirth) {
@@ -160,11 +159,36 @@ const validateIntakeForm = (formData, accountEmail = '') => {
     );
 
     if (Number.isNaN(dob.getTime()) || formData.dateOfBirth > TODAY || age < 5 || age > 120) {
-        return 'Enter a valid date of birth';
+        return 'Please enter a valid date of birth (age 5-120)';
     }
 
-    if (!PHONE_PATTERN.test(normalize(formData.phoneNumber))) {
-        return 'Enter a valid phone number';
+    if (!normalize(formData.presentingProblem) || normalize(formData.presentingProblem).length < 3) {
+        return 'Please describe your main concerns or symptoms (at least 3 characters)';
+    }
+
+    // Optional fields validated only when provided
+    if (formData.preferredName && !NAME_PATTERN.test(normalize(formData.preferredName))) {
+        return 'Enter a valid preferred name';
+    }
+
+    if (formData.phoneNumber && !PHONE_PATTERN.test(normalize(formData.phoneNumber))) {
+        return 'Enter a valid phone number (e.g. +1234567890)';
+    }
+
+    if (formData.emailAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalize(formData.emailAddress))) {
+        return 'Enter a valid email address';
+    }
+
+    if (formData.nationalId && !ID_PATTERN.test(normalize(formData.nationalId))) {
+        return 'National ID must be 4-30 letters, numbers, slashes, or hyphens';
+    }
+
+    if (formData.emergencyContactName && !NAME_PATTERN.test(normalize(formData.emergencyContactName))) {
+        return 'Enter a valid emergency contact name';
+    }
+
+    if (formData.emergencyContactRelationship && !TEXT_ONLY_PATTERN.test(normalize(formData.emergencyContactRelationship))) {
+        return 'Enter a valid emergency contact relationship';
     }
 
     if (formData.emergencyContactPhone && !PHONE_PATTERN.test(normalize(formData.emergencyContactPhone))) {
@@ -173,34 +197,6 @@ const validateIntakeForm = (formData, accountEmail = '') => {
 
     if (formData.emergencyContactAltPhone && !PHONE_PATTERN.test(normalize(formData.emergencyContactAltPhone))) {
         return 'Enter a valid alternative contact phone number';
-    }
-
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-        return 'Enter a valid email address';
-    }
-
-    if (normalizedAccountEmail && normalizedEmail !== normalizedAccountEmail) {
-        return 'The intake email must match the email on your account';
-    }
-
-    if (formData.nationalId && !ID_PATTERN.test(normalize(formData.nationalId))) {
-        return 'National ID must be 4-30 letters, numbers, slashes, or hyphens';
-    }
-
-    if (!NAME_PATTERN.test(normalize(formData.emergencyContactName))) {
-        return 'Enter a valid emergency contact name';
-    }
-
-    if (formData.emergencyContactRelationship && !TEXT_ONLY_PATTERN.test(normalize(formData.emergencyContactRelationship))) {
-        return 'Enter a valid emergency contact relationship';
-    }
-
-    if (!normalize(formData.presentingProblem) || normalize(formData.presentingProblem).length < 10) {
-        return 'Main concerns or symptoms should be at least 10 characters';
-    }
-
-    if (!normalize(formData.treatmentGoals) || normalize(formData.treatmentGoals).length < 10) {
-        return 'Treatment goals should be at least 10 characters';
     }
 
     return '';
@@ -279,7 +275,14 @@ const PatientIntake = () => {
                 const response = await fetch(`${API_BASE}/api/auth/intake`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const data = await response.json();
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    try { data = JSON.parse(text); } catch { data = { error: text }; }
+                }
 
                 if (!response.ok) {
                     throw new Error(data.error || 'Failed to load intake form.');
@@ -392,7 +395,18 @@ const PatientIntake = () => {
                 body: JSON.stringify(formData)
             });
 
-            const data = await response.json();
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = { error: text || `Server error (${response.status})` };
+                }
+            }
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to save intake form.');
             }

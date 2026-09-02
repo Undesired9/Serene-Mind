@@ -106,6 +106,7 @@ const Assessment = () => {
         };
 
         try {
+            setError('');
             const token = localStorage.getItem('serene_token');
             const response = await fetch(`${API_BASE}/api/auth/assessment`, {
                 method: 'POST',
@@ -119,8 +120,20 @@ const Assessment = () => {
                 })
             });
 
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = { error: text || `Server error (${response.status})` };
+                }
+            }
+
             if (!response.ok) {
-                const data = await response.json();
                 throw new Error(data.error || 'Failed to submit assessment.');
             }
 
@@ -282,6 +295,19 @@ const Assessment = () => {
                     >
                         <ArrowLeft size={16} /> Back
                     </button>
+                )}
+
+                {error && (
+                    <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-200 p-4 text-rose-700 flex items-center justify-between shadow-sm">
+                        <span className="text-sm font-medium">{error}</span>
+                        <button
+                            type="button"
+                            onClick={() => calculateResultsAndSubmit(answers)}
+                            className="text-xs bg-rose-600 text-white font-bold px-3.5 py-1.5 rounded-xl hover:bg-rose-700 transition shrink-0 ml-3"
+                        >
+                            Retry
+                        </button>
+                    </div>
                 )}
 
                 <AnimatePresence mode="wait">
