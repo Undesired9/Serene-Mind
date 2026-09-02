@@ -2,7 +2,6 @@
   "name": "serene-mind",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "description": "SereneMind AI-Powered Mental Wellness Platform",
   "scripts": {
     "dev": "vite",

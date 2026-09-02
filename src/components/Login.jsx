@@ -120,7 +120,18 @@ const Login = () => {
                 body: JSON.stringify(payload)
             });
 
-            const data = await response.json();
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = { error: text || `Server returned error status ${response.status}` };
+                }
+            }
 
             if (!response.ok) {
                 throw new Error(data.error || 'Authentication failed');
