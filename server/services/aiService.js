@@ -18,16 +18,14 @@ const MEDIUM_RISK_KEYWORDS = [
 ];
 
 const FAST_FREE_MODELS = [
+    'nvidia/nemotron-3.5-lightning:free',
     'google/gemini-2.0-flash-lite-preview:free',
     'meta-llama/llama-3.3-70b-instruct:free',
     'qwen/qwen-2.5-72b-instruct:free',
-    'mistralai/mistral-small-24b-instruct-2501:free',
-    'meta-llama/llama-3.1-8b-instruct:free'
+    'mistralai/mistral-small-24b-instruct-2501:free'
 ];
 
-// If env specifies nemotron, use gemini-flash instead to prevent chain-of-thought leakage
-const envModel = process.env.OPENROUTER_MODEL;
-const PRIMARY_MODEL = (envModel && !envModel.includes('nemotron')) ? envModel : FAST_FREE_MODELS[0];
+const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
 const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2));
 const BASE_RETRY_DELAY_MS = Math.max(150, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 400));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);

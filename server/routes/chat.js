@@ -345,14 +345,14 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 4. Try streaming if requested
         if (wantsStream && checkApiKey()) {
-            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache, no-transform');
-            res.setHeader('Connection', 'keep-alive');
-            res.flushHeaders?.();
-
             let accumulatedRaw = '';
 
             try {
+                res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+                res.setHeader('Cache-Control', 'no-cache, no-transform');
+                res.setHeader('Connection', 'keep-alive');
+                res.flushHeaders?.();
+
                 await streamOpenRouter(messages, (chunk) => {
                     accumulatedRaw += chunk;
                     res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
@@ -386,11 +386,41 @@ router.post('/', verifyToken, async (req, res) => {
                 })}\n\n`);
                 return res.end();
             } catch (streamErr) {
-                console.warn('Stream failed, continuing to non-streaming fallback:', streamErr.message);
+                console.warn('Stream failed, sending safe fallback via SSE:', streamErr.message);
+
+                const responseData = await handleChat(message, history, assessment);
+                
+                await new Promise((resolve, reject) => {
+                    db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
+                    [userId, responseData.reply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
+                    function(err) {
+                        if (err) reject(err);
+                        resolve();
+                    });
+                });
+
+                await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
+                const updatedStatus = await getOrCreateUserEscalationStatus(userId);
+                const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
+
+                if (res.headersSent) {
+                    res.write(`data: ${JSON.stringify({ chunk: responseData.reply })}\n\n`);
+                    res.write(`data: ${JSON.stringify({
+                        done: true,
+                        ...responseData,
+                        riskLevel: multiSignalEval.riskLevel,
+                        riskScore: multiSignalEval.riskScore,
+                        riskTier: multiSignalEval.riskLevel,
+                        interventions: recommendedInterventions,
+                        sessionId,
+                        escalationStatus: updatedStatus
+                    })}\n\n`);
+                    return res.end();
+                }
             }
         }
 
-        // 5. Non-streaming fallback
+        // 5. Non-streaming fallback (when stream is false or SSE wasn't initiated)
         const responseData = await handleChat(message, history, assessment);
         
         await new Promise((resolve, reject) => {
@@ -406,34 +436,19 @@ router.post('/', verifyToken, async (req, res) => {
         const updatedStatus = await getOrCreateUserEscalationStatus(userId);
         const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
 
-        if (wantsStream && !res.headersSent) {
-            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache, no-transform');
-            res.setHeader('Connection', 'keep-alive');
-            res.flushHeaders?.();
-            res.write(`data: ${JSON.stringify({ chunk: responseData.reply })}\n\n`);
-            res.write(`data: ${JSON.stringify({
-                done: true,
-                ...responseData,
+        if (!res.headersSent) {
+            return res.json({ 
+                ...responseData, 
                 riskLevel: multiSignalEval.riskLevel,
                 riskScore: multiSignalEval.riskScore,
                 riskTier: multiSignalEval.riskLevel,
                 interventions: recommendedInterventions,
                 sessionId,
                 escalationStatus: updatedStatus
-            })}\n\n`);
+            });
+        } else {
             return res.end();
         }
-
-        res.json({ 
-            ...responseData, 
-            riskLevel: multiSignalEval.riskLevel,
-            riskScore: multiSignalEval.riskScore,
-            riskTier: multiSignalEval.riskLevel,
-            interventions: recommendedInterventions,
-            sessionId,
-            escalationStatus: updatedStatus
-        });
     } catch (error) {
         console.error('Chat routing error:', error);
         if (!res.headersSent) {
