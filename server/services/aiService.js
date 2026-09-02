@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const CRISIS_KEYWORDS = [
     'suicide', 'kill myself', 'end my life', 'hurt myself', 'die', 'self-harm',
@@ -16,38 +17,25 @@ const MEDIUM_RISK_KEYWORDS = [
     'sad', 'stressed', 'worried', 'upset', 'frustrated', 'angry', 'tired'
 ];
 
-let genAI;
-
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
-const FALLBACK_MODELS = [
-    ...new Set(
-        (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.0-flash')
-            .split(',')
-            .map((model) => model.trim())
-            .filter(Boolean)
-            .filter((model) => model !== PRIMARY_MODEL)
-    )
-];
+const PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
+const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2));
+const BASE_RETRY_DELAY_MS = Math.max(200, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 700));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
-const MAX_RETRIES = Math.max(0, Number(process.env.GEMINI_MAX_RETRIES || 2));
-const BASE_RETRY_DELAY_MS = Math.max(200, Number(process.env.GEMINI_RETRY_DELAY_MS || 700));
 
-async function initAI() {
-    if (genAI) return;
+let apiKeyAvailable = false;
 
-    try {
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            throw new Error("GEMINI_API_KEY not found in environment variables");
-        }
-        genAI = new GoogleGenerativeAI(apiKey);
-        console.log("✅ Gemini API initialized");
-    } catch (error) {
-        console.error("❌ Gemini init failed:", error);
+function checkApiKey() {
+    const apiKey = process.env.serenemind;
+    if (!apiKey) {
+        console.error("❌ OpenRouter API key not found. Set 'serenemind' environment variable.");
+        return false;
     }
+    apiKeyAvailable = true;
+    console.log("✅ OpenRouter API key found");
+    return true;
 }
 
-initAI();
+checkApiKey();
 
 const getRiskTier = (score) => {
     if (score >= 90) return 'CRITICAL';
@@ -150,68 +138,99 @@ const cleanOutput = (text) => {
         .trim();
 };
 
-const sanitizeHistoryForGemini = (history = []) => {
-    const normalizedHistory = history
+const sanitizeHistoryForOpenRouter = (history = []) => {
+    return history
         .map((msg) => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            text: (msg.text || msg.content || '').trim()
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: (msg.text || msg.content || '').trim()
         }))
-        .filter((msg) => msg.text)
-        .map((msg) => ({
-            role: msg.role,
-            parts: [{ text: msg.text }]
-        }));
-
-    while (normalizedHistory.length > 0 && normalizedHistory[0].role !== 'user') {
-        normalizedHistory.shift();
-    }
-
-    return normalizedHistory;
+        .filter((msg) => msg.content);
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const isRetryableGeminiError = (error) => {
-    const status = error?.status;
-    const message = `${error?.message || ''} ${error?.statusText || ''}`.toLowerCase();
-
-    return RETRYABLE_STATUS_CODES.has(status) ||
-        message.includes('service unavailable') ||
-        message.includes('high demand') ||
-        message.includes('temporarily unavailable') ||
-        message.includes('overloaded');
+const isRetryableError = (status) => {
+    return RETRYABLE_STATUS_CODES.has(status);
 };
 
 const getRetryDelay = (attempt) =>
     BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
 
-const runWithModelResilience = async (runner) => {
-    const modelsToTry = [PRIMARY_MODEL, ...FALLBACK_MODELS];
+/**
+ * Call OpenRouter API with the given messages.
+ * Uses the OpenAI-compatible chat completions endpoint.
+ */
+const callOpenRouter = async (messages, options = {}) => {
+    const apiKey = process.env.serenemind;
+    if (!apiKey) {
+        throw new Error("OpenRouter API key ('serenemind') not found in environment variables");
+    }
+
+    const {
+        model = PRIMARY_MODEL,
+        maxTokens = 1000,
+        temperature = 0.7,
+        topP = 0.9
+    } = options;
+
     let lastError;
 
-    for (const modelName of modelsToTry) {
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
-            try {
-                return await runner(modelName);
-            } catch (error) {
-                lastError = error;
-                const canRetrySameModel = isRetryableGeminiError(error) && attempt < MAX_RETRIES;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://serenemind.vercel.app',
+                    'X-Title': 'SereneMind'
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    max_tokens: maxTokens,
+                    temperature,
+                    top_p: topP
+                })
+            });
 
-                if (canRetrySameModel) {
+            if (!response.ok) {
+                const errorBody = await response.text().catch(() => 'Unknown error');
+                const error = new Error(`OpenRouter API error: ${response.status} - ${errorBody}`);
+                error.status = response.status;
+
+                if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
                     const delay = getRetryDelay(attempt);
-                    console.warn(`Gemini request failed on ${modelName} (attempt ${attempt + 1}). Retrying in ${delay}ms...`, {
-                        status: error?.status,
-                        statusText: error?.statusText
+                    console.warn(`OpenRouter request failed (attempt ${attempt + 1}). Retrying in ${delay}ms...`, {
+                        status: response.status
                     });
                     await sleep(delay);
                     continue;
                 }
 
-                console.warn(`Gemini request failed on ${modelName}.`, {
-                    status: error?.status,
-                    statusText: error?.statusText
-                });
-                break;
+                throw error;
+            }
+
+            const data = await response.json();
+            const content = data?.choices?.[0]?.message?.content;
+
+            if (!content) {
+                throw new Error('No content in OpenRouter response');
+            }
+
+            return content;
+        } catch (error) {
+            lastError = error;
+
+            if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
+                const delay = getRetryDelay(attempt);
+                console.warn(`OpenRouter request failed (attempt ${attempt + 1}). Retrying in ${delay}ms...`);
+                await sleep(delay);
+                continue;
+            }
+
+            if (attempt >= MAX_RETRIES) {
+                throw error;
             }
         }
     }
@@ -225,7 +244,7 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
 
     if (riskTier === 'CRITICAL') {
         return {
-            reply: "I’m really sorry you’re feeling this way. Please reach out to a trusted person or your local emergency service right now—you don’t have to face this alone.",
+            reply: "I'm really sorry you're feeling this way. Please reach out to a trusted person or your local emergency service right now—you don't have to face this alone.",
             riskLevel,
             riskScore,
             riskTier,
@@ -233,9 +252,7 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
         };
     }
 
-    await initAI();
-
-    if (!genAI) {
+    if (!checkApiKey()) {
         return {
             reply: "I'm having trouble connecting right now. Please try again shortly.",
             riskLevel,
@@ -246,26 +263,21 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
     }
 
     try {
-        const chatHistory = sanitizeHistoryForGemini(history);
-        const raw = await runWithModelResilience(async (modelName) => {
-            const modelInstance = genAI.getGenerativeModel({
-                model: modelName,
-                systemInstruction: buildSystemPrompt(assessment)
-            });
+        const chatHistory = sanitizeHistoryForOpenRouter(history);
+        const systemPrompt = buildSystemPrompt(assessment);
 
-            const chat = modelInstance.startChat({
-                history: chatHistory,
-                generationConfig: {
-                    maxOutputTokens: 1000,
-                    temperature: 0.7,
-                    topP: 0.9
-                }
-            });
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...chatHistory,
+            { role: 'user', content: message }
+        ];
 
-            const result = await chat.sendMessage(message);
-            const response = await result.response;
-            return response.text();
+        const raw = await callOpenRouter(messages, {
+            maxTokens: 1000,
+            temperature: 0.7,
+            topP: 0.9
         });
+
         const reply = cleanOutput(raw) || "I hear you. Tell me more about that.";
 
         return {
@@ -280,7 +292,7 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
         console.error("❌ Generation error:", error);
 
         return {
-            reply: "I’m here with you—could you say that again?",
+            reply: "I'm here with you—could you say that again?",
             riskLevel,
             riskScore,
             riskTier,
@@ -290,9 +302,7 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
 };
 
 const generatePatientReportMock = async (patient, moodLogs, recentSessions) => {
-    await initAI();
-
-    if (!genAI) {
+    if (!checkApiKey()) {
         return {
             title: `AI Wellness Summary for ${patient.username}`,
             content: "AI service unavailable."
@@ -308,7 +318,7 @@ const generatePatientReportMock = async (patient, moodLogs, recentSessions) => {
 
         const hasHighRisk = recentSessions.some(s => s.risk_level === 'HIGH');
 
-        const prompt = `
+        const userPrompt = `
 Patient: ${patient.username}
 Mood: ${moodSummary}
 Risk: ${hasHighRisk ? "Recent HIGH risk detected" : "No recent high risk"}
@@ -316,22 +326,17 @@ Risk: ${hasHighRisk ? "Recent HIGH risk detected" : "No recent high risk"}
 Write a short clinical summary.
 `;
 
-        const content = await runWithModelResilience(async (modelName) => {
-            const modelInstance = genAI.getGenerativeModel({
-                model: modelName,
-                systemInstruction: "You are an expert clinical therapist. Write an objective, concise, and professional mental health wellness summary of the patient's current psychological state, mood trends, and potential focus areas based on the provided session data."
-            });
+        const messages = [
+            {
+                role: 'system',
+                content: "You are an expert clinical therapist. Write an objective, concise, and professional mental health wellness summary of the patient's current psychological state, mood trends, and potential focus areas based on the provided session data."
+            },
+            { role: 'user', content: userPrompt }
+        ];
 
-            const result = await modelInstance.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    maxOutputTokens: 1000,
-                    temperature: 0.3
-                }
-            });
-
-            const response = await result.response;
-            return response.text();
+        const content = await callOpenRouter(messages, {
+            maxTokens: 1000,
+            temperature: 0.3
         });
 
         return {
