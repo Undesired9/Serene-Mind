@@ -85,26 +85,20 @@ const detectRisk = (message) => {
 };
 
 const buildSystemPrompt = (assessment) => {
-    let prompt = `You are SereneMind, a warm, professional, and empathetic therapist. Your approach is grounded in Person-Centered Therapy, Cognitive Behavioral Therapy (CBT), and mindfulness-based counseling.
+    let prompt = `You are SereneMind, a compassionate, warm, and highly skilled licensed psychotherapist and mental wellness companion. You are in a 1-on-1 private therapy session with a client.
 
-ROLE:
-- Provide a safe, non-judgmental space for emotional exploration and validation.
-- Practice active listening: reflect feelings, validate experiences, and encourage self-compassion.
-- Guide the user gently toward self-discovery, helping them reframe unhelpful thoughts or explore coping strategies.
+CORE THERAPEUTIC APPROACH:
+- Person-Centered Therapy (Carl Rogers): Offer unconditional positive regard, deep empathy, and genuine emotional validation.
+- Cognitive Behavioral Therapy (CBT): Gently help the client identify feelings, reframe negative thoughts, and explore healthy coping strategies.
 
-HOW TO RESPOND:
-- Always respond in the EXACT same language that the user is using (e.g., English, Spanish, French, Urdu, Hindi, Arabic, Chinese, etc.).
-- Always acknowledge and validate the user's emotion first (e.g., "It sounds like you're carrying a lot of weight," or "That sounds incredibly stressful to navigate").
-- Keep responses short, concise, and natural (1-3 sentences max).
-- Ask exactly one open-ended, thought-provoking question to help them reflect further (e.g., "How does that thought make you feel about yourself?" or "What kind of support do you feel you need most right now?").
-- Maintain a warm, conversational, yet clinically sound therapeutic tone.
-
-STRICT RULES:
-- Never offer quick fixes, unsolicited advice, or lists of instructions.
-- Do not make clinical diagnoses or prescribe medication.
-- Avoid sounding clinical, robotic, or overly structured.
-- Do not repeat the user's statements word-for-word.
-- Never output reasoning blocks, thoughts, plans, or bulleted lists.
+CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
+1. TALK DIRECTLY TO THE CLIENT: Always speak directly to the person in front of you ("I hear you", "You are not alone", "It's completely understandable to feel that way").
+2. ABSOLUTELY NO META-ANALYSIS OR REASONING: NEVER output any thinking process, internal monologue, notes, outlines, or headers like "Here's a thinking process:" or bullet points analyzing what the user said. Output ONLY your spoken therapist words.
+3. CONVERSATIONAL FLOW (2-4 natural sentences):
+   - First, deeply validate their emotion (e.g. "I can hear how exhausting and heavy depression feels right now. It takes real courage to put those feelings into words.").
+   - Then, ask exactly ONE gentle, open-ended question or offer a comforting reflection to help them explore what they are going through.
+4. NATURAL HUMAN TONE: Sound like an empathetic, real therapist sitting across from them — warm, gentle, non-judgmental, and validating.
+5. LANGUAGE: Respond in the exact same language or dialect the client is writing in (English, Urdu, etc.).
 
 CRISIS PROTOCOL:
 - If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines.`;
@@ -112,30 +106,47 @@ CRISIS PROTOCOL:
     if (assessment) {
         prompt += `
 
-PATIENT ASSESSMENT INFORMATION:
-- Completed intake assessment: Yes
-- PHQ-9 (Depression) Score: ${assessment.phq9_score || 'Not provided'}
-- GAD-7 (Anxiety) Score: ${assessment.gad7_score || 'Not provided'}
-- Severity: ${assessment.severity || 'Not provided'}
+PATIENT ASSESSMENT CONTEXT:
+- PHQ-9 (Depression): ${assessment.phq9_score || 'Not provided'}
+- GAD-7 (Anxiety): ${assessment.gad7_score || 'Not provided'}
 - Main Concern: ${assessment.main_concern || 'Not provided'}
-- Additional Notes: ${assessment.notes || 'Not provided'}
+- Notes: ${assessment.notes || 'Not provided'}
 
-INSTRUCTIONS:
-- Take the above assessment into account when responding to the user.
-- Tailor your support to their specific concerns and severity level.
-- Reference their assessment data naturally in your responses only when relevant, without being clinical about it.`;
+Keep this clinical context in mind to tailor your empathy, without explicitly citing scores unless helpful.`;
     }
 
     return prompt;
 };
 
 const cleanOutput = (text) => {
-    return text
-        .replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '')
-        .replace(/thought[\s\S]*?\n\n/i, '')
-        .replace(/plan:[\s\S]*/i, '')
-        .replace(/^(?:SereneMind|Counselor|Counselor AI|Therapist|AI|System)\s*:\s*/i, '')
-        .trim();
+    if (!text || typeof text !== 'string') return '';
+    let cleaned = text;
+
+    // 1. Strip explicit <think>...</think> XML blocks
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    // 2. Strip "Here's a thinking process:" / "Thinking Process:" blocks and any following bullet points
+    cleaned = cleaned.replace(/(?:here(?:'s| is) (?:a |the )?(?:thinking|thought) process|thinking process|thought process):?[\s\S]*?(?=\n\s*\n\s*[A-Za-z"']|\n\s*\n\s*\*\*|$)/gi, '');
+
+    // 3. Strip any leading or isolated reasoning bullet points (e.g. lines starting with "- User:", "* User:", "- Language:", "- Tone:")
+    cleaned = cleaned.replace(/(?:^|\n)[-*•]\s*(?:User|Language|Tone|Intent|Response|Therapeutic|Goal|Emotional|State|Observation|Plan)[^\n]*/gi, '');
+
+    // 4. If the text still contains separate paragraphs and the first paragraph is an outline/analysis, grab the conversational text
+    const paragraphs = cleaned.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length > 1 && (paragraphs[0].startsWith('-') || paragraphs[0].startsWith('*') || /thinking process/i.test(paragraphs[0]))) {
+        const directReply = paragraphs.find(p => !p.startsWith('-') && !p.startsWith('*') && !/thinking process/i.test(p) && p.length > 15);
+        if (directReply) {
+            cleaned = directReply;
+        }
+    }
+
+    // 5. Strip persona prefixes (e.g. "SereneMind:", "Therapist:", "AI:")
+    cleaned = cleaned.replace(/^(?:SereneMind|Counselor|Counselor AI|Therapist|AI|System)\s*:\s*/i, '');
+
+    // 6. Strip numbered lists if any were accidentally produced
+    cleaned = cleaned.replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '');
+
+    return cleaned.trim();
 };
 
 const sanitizeHistoryForOpenRouter = (history = []) => {
@@ -359,5 +370,7 @@ module.exports = {
     detectRisk,
     getRiskTier,
     getRiskLevelFromTier,
-    generatePatientReportMock
+    generatePatientReportMock,
+    cleanOutput,
+    buildSystemPrompt
 };

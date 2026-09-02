@@ -119,6 +119,37 @@ test('NFR-INP-5: Date of Birth age invariant verification (5 <= age <= 120)', ()
     assert(futureDob > today.toISOString().split('T')[0], 'Future DOB must be flagged invalid');
 });
 
+// 3. NFR-AI: Empathetic AI Output Sanitization & Persona Invariants
+test('NFR-AI-1: Must strip "Here\'s a thinking process:" and reasoning meta-analysis', () => {
+    const { cleanOutput } = require('../services/aiService');
+    const rawAiOutput = `Here's a thinking process:
+- User says: "i am feeling so depresses"
+- Language: English (with a typo "depresses" -> likely "depressed")
+- Emotional state: Low mood, feeling down
+- Therapeutic Goal: Validate emotion, provide warmth
+
+I hear how heavy and exhausting things feel for you right now, and I'm really glad you reached out. When you're carrying so much, what has felt like the hardest part of your day?`;
+
+    const cleaned = cleanOutput(rawAiOutput);
+    assert(!cleaned.includes("thinking process"), "Must not include 'thinking process'");
+    assert(!cleaned.includes("- User says:"), "Must not include bullet analysis");
+    assert(cleaned.startsWith("I hear how heavy"), "Must start directly with the empathetic therapist reply");
+});
+
+test('NFR-AI-2: Must strip <think> XML tags from reasoning models', () => {
+    const { cleanOutput } = require('../services/aiService');
+    const rawXml = `<think>
+Analyze user anxiety.
+Apply Carl Rogers validation.
+</think>
+It sounds like everything is feeling overwhelming right now. Take a gentle breath with me. What is weighing on your mind most?`;
+
+    const cleaned = cleanOutput(rawXml);
+    assert(!cleaned.includes("<think>"), "Must strip <think>");
+    assert(!cleaned.includes("</think>"), "Must strip </think>");
+    assert(cleaned.startsWith("It sounds like"), "Must retain clean therapeutic text");
+});
+
 console.log(`\n📊 Test Run Summary: ${passed} passed, ${failed} failed.\n`);
 
 if (failed > 0) {
