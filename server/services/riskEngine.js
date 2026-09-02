@@ -18,6 +18,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
     let score = 0;
     const triggeredSignals = [];
     let safetyFlag = false;
+    let hasConversationalCrisis = false;
 
     // 1. Check conversational / immediate message text if present
     if (incomingSignal.messageText) {
@@ -27,6 +28,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
         if (hasCrisis) {
             score += 90;
             safetyFlag = true;
+            hasConversationalCrisis = true;
             triggeredSignals.push({ type: 'CONVERSATIONAL_CRISIS_KEYWORD', signal: 'Explicit crisis or self-harm keywords' });
         }
 
@@ -50,8 +52,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
         const selfHarmRisk = assessment.self_harm_risk;
 
         if (selfHarmRisk) {
-            score += 85;
-            safetyFlag = true;
+            score += 40;
             triggeredSignals.push({ type: 'SAFETY_SCREEN_POSITIVE', signal: 'PHQ-9 Item 9 / Safety screening indicated self-harm ideation' });
         }
 
@@ -123,7 +124,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
         riskScore: score,
         triggeredSignals,
         actionTaken,
-        isCrisis: riskLevel === 'CRITICAL'
+        isCrisis: hasConversationalCrisis
     };
 };
 

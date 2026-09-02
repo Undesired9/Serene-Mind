@@ -102,6 +102,19 @@ router.get('/escalation-status', verifyToken, async (req, res) => {
     }
 });
 
+// POST: Unlock chat for user
+router.post('/unlock', verifyToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        await updateUserEscalationStatus(userId, 0, 'LOW', false);
+        const status = await getOrCreateUserEscalationStatus(userId);
+        res.json({ message: 'Chat unlocked successfully', status });
+    } catch (err) {
+        console.error('Failed to unlock chat:', err);
+        res.status(500).json({ error: 'Failed to unlock chat' });
+    }
+});
+
 // GET: Fetch all sessions for a user
 router.get('/sessions', verifyToken, (req, res) => {
     const userId = req.user.id;
@@ -242,16 +255,6 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     try {
-        // Check if chat is locked for this user
-        const escalationStatus = await getOrCreateUserEscalationStatus(userId);
-        if (escalationStatus.is_chat_locked) {
-            return res.status(403).json({ 
-                error: 'Chat is locked. Please book an appointment with a doctor to continue.',
-                chatLocked: true,
-                escalationStatus
-            });
-        }
-
         // Multi-Signal Risk Evaluation (Deterministic Preprocessor)
         const multiSignalEval = await evaluateMultiSignalRisk(userId, { messageText: message });
         const isCritical = multiSignalEval.isCrisis;
@@ -270,7 +273,7 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 2. If Critical Risk flagged, send safe crisis fallback immediately
+        // 2. If Critical Risk flagged on active message, send safe crisis fallback immediately
         if (isCritical) {
             const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the Umang Pakistan Mental Health Helpline (call 0311-7786264), call Rescue 1122, or reach out to a trusted loved one or emergency doctor immediately. You do not have to carry this alone.";
             
@@ -313,13 +316,12 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        // 5. Update user's escalation status (lock chat for HIGH/CRITICAL risk)
-        const shouldLock = multiSignalEval.riskScore >= 66;
+        // 5. Update user's escalation status (keep unlocked for normal conversational support)
         await updateUserEscalationStatus(
             userId, 
             multiSignalEval.riskScore, 
             multiSignalEval.riskLevel, 
-            shouldLock
+            false
         );
 
         const updatedStatus = await getOrCreateUserEscalationStatus(userId);

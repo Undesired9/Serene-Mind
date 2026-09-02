@@ -349,29 +349,45 @@ const ChatInterface = () => {
             </button>
             </header>
 
-            {/* Chat Locked Banner */}
+            {/* Chat Advisory / Review Banner */}
             <AnimatePresence>
                 {escalationStatus?.is_chat_locked && (
                     <motion.div 
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-amber-100 border-b border-amber-300 p-4 shrink-0 flex items-center justify-between z-10"
+                        className="bg-amber-50 border-b border-amber-200 p-4 shrink-0 flex flex-wrap items-center justify-between gap-3 z-10"
                     >
-                        <div className="flex items-start gap-4">
-                            <Lock className="text-amber-600 shrink-0 mt-0.5" />
+                        <div className="flex items-start gap-3">
+                            <Lock className="text-amber-600 shrink-0 mt-0.5" size={20} />
                             <div>
-                                <h3 className="text-amber-800 font-bold text-lg">Session Review Required</h3>
-                                <p className="text-amber-700/80 text-sm mt-1 max-w-2xl">
-                                    To ensure you receive the best care, we require a brief check-in with a licensed clinician.
+                                <h3 className="text-amber-900 font-bold text-sm md:text-base">Clinical Check-in Recommended</h3>
+                                <p className="text-amber-800/80 text-xs md:text-sm mt-0.5 max-w-2xl">
+                                    Based on your care profile, we recommend scheduling a session with a licensed clinician. You may also continue your conversational AI support.
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => setShowBookingModal(true)}
-                            className="bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-700 transition shadow-lg"
-                        >
-                            Book Now
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={async () => {
+                                    const token = localStorage.getItem('serene_token');
+                                    await fetch(`${API_BASE}/api/chat/unlock`, {
+                                        method: 'POST',
+                                        headers: { Authorization: `Bearer ${token}` }
+                                    });
+                                    setEscalationStatus(prev => ({ ...prev, is_chat_locked: 0 }));
+                                    setIsCrisis(false);
+                                }}
+                                className="bg-white border border-amber-300 text-amber-900 text-xs font-semibold py-2 px-3.5 rounded-lg hover:bg-amber-100 transition"
+                            >
+                                Dismiss / Resume Chat
+                            </button>
+                            <button
+                                onClick={() => setShowBookingModal(true)}
+                                className="bg-amber-600 text-white text-xs font-semibold py-2 px-3.5 rounded-lg hover:bg-amber-700 transition shadow-sm"
+                            >
+                                Book Now
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -445,13 +461,11 @@ const ChatInterface = () => {
                         type="text" 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        disabled={isCrisis || escalationStatus?.is_chat_locked}
+                        disabled={isCrisis}
                         placeholder={
                             isCrisis 
-                                ? "Chat disabled during emergency protocol." 
-                                : escalationStatus?.is_chat_locked 
-                                    ? "Chat locked - please book a session first." 
-                                    : (isRecording ? "Listening..." : t('chat_placeholder'))
+                                ? "Emergency protocol active. Please use the helpline links above." 
+                                : (isRecording ? "Listening..." : t('chat_placeholder'))
                         }
                         className={`flex-1 bg-white/80 text-[#0D1B2A] placeholder-[#3D5A80]/60 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-[#1B98E0] border transition disabled:opacity-50 disabled:cursor-not-allowed text-[15px] ${isRecording ? 'border-[#1B98E0] ring-2 ring-[#1B98E0]/20 bg-[#C2FFF0]/20' : 'border-[#0E7C7B]/15'}`}
                         autoFocus
@@ -459,7 +473,7 @@ const ChatInterface = () => {
                     <button 
                         type="button"
                         onClick={toggleVoice}
-                        disabled={isCrisis || escalationStatus?.is_chat_locked}
+                        disabled={isCrisis}
                         className={`w-14 rounded-2xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' : 'bg-[#C2FFF0]/60 hover:bg-[#C2FFF0] text-[#0E7C7B] shadow-[#0E7C7B]/10'}`}
                         title={isRecording ? "Click to stop recording" : "Click to start recording"}
                     >
