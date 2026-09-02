@@ -33,7 +33,7 @@ const allRows = (sql, params = []) => new Promise((resolve, reject) => {
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const LICENSE_PATTERN = /^[A-Za-z0-9/-][A-Za-z0-9/ -]*$/;
 const PERSON_NAME_PATTERN = /^[A-Za-z][A-Za-z\s.'-]{1,79}$/;
-const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
+const PHONE_PATTERN = /^\+?[0-9\s()-]{7,18}$/;
 const GENERIC_TEXT_PATTERN = /^[A-Za-z0-9\s,.'()/-]{2,80}$/;
 const NATIONAL_ID_PATTERN = /^[A-Za-z0-9/-]{4,30}$/;
 

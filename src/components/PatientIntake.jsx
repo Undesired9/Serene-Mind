@@ -33,6 +33,19 @@ const DURATION_OPTIONS = [
     { value: 'Over 1 year', label: 'Over 1 year' }
 ];
 
+const sanitizePhone = (val = '') => {
+    // Only allow digits, plus sign at start, spaces, dashes, and parentheses, capped at 16 chars
+    return String(val)
+        .replace(/[^0-9+\s()-]/g, '')
+        .slice(0, 16);
+};
+
+const sanitizeName = (val = '') => {
+    return String(val)
+        .replace(/[^A-Za-z\s.'-]/g, '')
+        .slice(0, 80);
+};
+
 const PatientIntake = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1); // 1 = Personal & Contact, 2 = Clinical Context
@@ -104,7 +117,18 @@ const PatientIntake = () => {
     }, []);
 
     const handleChange = (field, value) => {
-        setFormData((prev) => ({ ...prev, [field]: value }));
+        let cleanedValue = value;
+        if (field === 'phoneNumber' || field === 'emergencyContactPhone') {
+            cleanedValue = sanitizePhone(value);
+        } else if (field === 'fullLegalName' || field === 'emergencyContactName') {
+            cleanedValue = sanitizeName(value);
+        } else if (field === 'presentingProblem') {
+            cleanedValue = value.slice(0, 1000);
+        } else if (field === 'treatmentGoals' || field === 'currentMedicalConditions') {
+            cleanedValue = value.slice(0, 500);
+        }
+
+        setFormData((prev) => ({ ...prev, [field]: cleanedValue }));
         if (error) setError('');
     };
 
@@ -112,6 +136,9 @@ const PatientIntake = () => {
         const name = formData.fullLegalName.trim();
         if (!name || name.length < 2) {
             return 'Please enter your full legal name (at least 2 characters).';
+        }
+        if (name.length > 80) {
+            return 'Full legal name must not exceed 80 characters.';
         }
         if (!NAME_PATTERN.test(name)) {
             return 'Full legal name should contain letters, spaces, dots, or hyphens only.';
@@ -135,18 +162,18 @@ const PatientIntake = () => {
         }
 
         const phone = formData.phoneNumber.trim();
-        if (!phone || !PHONE_PATTERN.test(phone)) {
-            return 'Please enter a valid primary phone number.';
+        if (!phone || phone.length < 7 || phone.length > 18 || !PHONE_PATTERN.test(phone)) {
+            return 'Please enter a valid primary phone number (7-16 digits, e.g. +1 555-0199).';
         }
 
         const eName = formData.emergencyContactName.trim();
-        if (!eName || !NAME_PATTERN.test(eName)) {
+        if (!eName || eName.length < 2 || !NAME_PATTERN.test(eName)) {
             return 'Please enter an emergency contact full name.';
         }
 
         const ePhone = formData.emergencyContactPhone.trim();
-        if (!ePhone || !PHONE_PATTERN.test(ePhone)) {
-            return 'Please enter a valid emergency contact phone number.';
+        if (!ePhone || ePhone.length < 7 || ePhone.length > 18 || !PHONE_PATTERN.test(ePhone)) {
+            return 'Please enter a valid emergency contact phone number (7-16 digits).';
         }
 
         return '';
@@ -155,7 +182,10 @@ const PatientIntake = () => {
     const validateStep2 = () => {
         const problem = formData.presentingProblem.trim();
         if (!problem || problem.length < 3) {
-            return 'Please provide a brief description of what brings you in.';
+            return 'Please provide a brief description of what brings you in (at least 3 characters).';
+        }
+        if (problem.length > 1000) {
+            return 'Primary concern must not exceed 1000 characters.';
         }
         return '';
     };
@@ -307,6 +337,8 @@ const PatientIntake = () => {
                                         value={formData.fullLegalName}
                                         onChange={(e) => handleChange('fullLegalName', e.target.value)}
                                         placeholder="e.g. John Doe"
+                                        minLength={2}
+                                        maxLength={80}
                                         className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
                                         required
                                     />
@@ -352,13 +384,15 @@ const PatientIntake = () => {
                                 <div className="md:col-span-2">
                                     <label className="flex items-center justify-between text-sm font-semibold text-[#0D1B2A] mb-1.5">
                                         <span>Primary Phone Number <span className="text-rose-500">*</span></span>
-                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required</span>
+                                        <span className="text-[11px] font-medium text-[#1B98E0]">Required (7-16 digits)</span>
                                     </label>
                                     <input
                                         type="tel"
                                         value={formData.phoneNumber}
                                         onChange={(e) => handleChange('phoneNumber', e.target.value)}
                                         placeholder="e.g. +1 555-0199"
+                                        minLength={7}
+                                        maxLength={16}
                                         className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-3 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
                                         required
                                     />
@@ -383,6 +417,8 @@ const PatientIntake = () => {
                                             value={formData.emergencyContactName}
                                             onChange={(e) => handleChange('emergencyContactName', e.target.value)}
                                             placeholder="e.g. Jane Doe"
+                                            minLength={2}
+                                            maxLength={80}
                                             className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
                                             required
                                         />
@@ -391,13 +427,15 @@ const PatientIntake = () => {
                                     <div>
                                         <label className="flex items-center justify-between text-xs font-semibold text-[#3D5A80] mb-1.5">
                                             <span>Contact Phone Number <span className="text-rose-500">*</span></span>
-                                            <span className="text-[10px] text-[#1B98E0]">Required</span>
+                                            <span className="text-[10px] text-[#1B98E0]">Required (7-16 digits)</span>
                                         </label>
                                         <input
                                             type="tel"
                                             value={formData.emergencyContactPhone}
                                             onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
                                             placeholder="e.g. +1 555-0188"
+                                            minLength={7}
+                                            maxLength={16}
                                             className="w-full rounded-xl border border-[#0E7C7B]/20 bg-[#F8FBFB] px-4 py-2.5 text-sm text-[#0D1B2A] outline-none focus:border-[#1B98E0] focus:bg-white transition"
                                             required
                                         />
