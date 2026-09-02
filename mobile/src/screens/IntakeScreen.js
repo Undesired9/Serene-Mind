@@ -3,6 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, SafeAr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 
+const GENDER_OPTIONS = ['Male', 'Female', 'Non-Binary', 'Prefer not to say'];
+const DURATION_OPTIONS = ['< 1 month', '1-3 months', '3-6 months', '6+ months'];
+
 export default function IntakeScreen({ onComplete }) {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -13,24 +16,22 @@ export default function IntakeScreen({ onComplete }) {
     const [preferredName, setPreferredName] = useState('');
     const [dateOfBirth, setDateOfBirth] = useState('2000-01-01');
     const [genderSex, setGenderSex] = useState('Prefer not to say');
-    const [phoneNumber, setPhoneNumber] = useState('+1 555-0199');
+    const [phoneNumber, setPhoneNumber] = useState('0300-1234567');
     const [emailAddress, setEmailAddress] = useState('');
-    const [address, setAddress] = useState('123 Wellness Way, City');
 
     // Step 2: Emergency Contact
-    const [emergencyContactName, setEmergencyContactName] = useState('Sarah Doe');
-    const [emergencyContactRelationship, setEmergencyContactRelationship] = useState('Sibling');
-    const [emergencyContactPhone, setEmergencyContactPhone] = useState('+1 555-0188');
+    const [emergencyContactName, setEmergencyContactName] = useState('Family Member');
+    const [emergencyContactRelationship, setEmergencyContactRelationship] = useState('Parent / Sibling');
+    const [emergencyContactPhone, setEmergencyContactPhone] = useState('0312-3456789');
 
     // Step 3: Clinical Concerns & Goals
-    const [presentingProblem, setPresentingProblem] = useState('Experiencing persistent stress and anxiety regarding work and sleep quality.');
+    const [presentingProblem, setPresentingProblem] = useState('Experiencing persistent stress, overwhelm, and sleep disturbances.');
     const [symptomDuration, setSymptomDuration] = useState('3-6 months');
-    const [treatmentGoals, setTreatmentGoals] = useState('Learn effective mindfulness techniques, improve emotional regulation, and achieve better sleep.');
+    const [treatmentGoals, setTreatmentGoals] = useState('Learn effective coping strategies, emotional regulation, and achieve better sleep.');
 
-    // Step 4: Medical History
+    // Medical Conditions (Optional)
     const [currentMedications, setCurrentMedications] = useState('None');
     const [allergies, setAllergies] = useState('None');
-    const [familyMentalHealthConditions, setFamilyMentalHealthConditions] = useState('None');
 
     useEffect(() => {
         const loadUser = async () => {
@@ -53,41 +54,62 @@ export default function IntakeScreen({ onComplete }) {
         loadUser();
     }, []);
 
+    const sanitizePhone = (text) => {
+        return text.replace(/[^0-9+\s()-]/g, '').slice(0, 16);
+    };
+
+    const handleNext = () => {
+        if (step === 1) {
+            if (!fullLegalName.trim() || fullLegalName.trim().length < 2) {
+                Alert.alert('Required Field', 'Please enter your full legal name.');
+                return;
+            }
+            if (!dateOfBirth.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth.trim())) {
+                Alert.alert('Invalid Date', 'Please enter your Date of Birth in YYYY-MM-DD format.');
+                return;
+            }
+            if (!phoneNumber.trim() || phoneNumber.trim().length < 7) {
+                Alert.alert('Phone Required', 'Please enter a valid phone number.');
+                return;
+            }
+            setStep(2);
+        } else if (step === 2) {
+            if (!emergencyContactName.trim()) {
+                Alert.alert('Required Field', 'Please provide an emergency contact name.');
+                return;
+            }
+            if (!emergencyContactPhone.trim() || emergencyContactPhone.trim().length < 7) {
+                Alert.alert('Required Field', 'Please provide a valid emergency contact phone number.');
+                return;
+            }
+            setStep(3);
+        }
+    };
+
     const handleFinish = async () => {
-        if (!fullLegalName.trim() || !dateOfBirth.trim() || !phoneNumber.trim()) {
-            Alert.alert('Required Fields', 'Please complete your identification and contact info.');
-            return;
-        }
-
-        if (!emergencyContactName.trim() || !emergencyContactPhone.trim()) {
-            Alert.alert('Emergency Contact Required', 'Please provide an emergency contact name and phone.');
-            return;
-        }
-
-        if (presentingProblem.trim().length < 10 || treatmentGoals.trim().length < 10) {
-            Alert.alert('Clinical Info Required', 'Presenting problems and goals must be at least 10 characters.');
+        if (presentingProblem.trim().length < 8) {
+            Alert.alert('Clinical Info Required', 'Please briefly describe what you would like support with.');
             return;
         }
 
         setLoading(true);
         try {
             const payload = {
-                fullLegalName: fullLegalName.trim(),
-                preferredName: preferredName.trim() || fullLegalName.trim(),
+                fullLegalName: fullLegalName.trim().slice(0, 80),
+                preferredName: (preferredName || fullLegalName).trim().slice(0, 80),
                 dateOfBirth: dateOfBirth.trim(),
                 genderSex: genderSex.trim(),
-                phoneNumber: phoneNumber.trim(),
+                phoneNumber: phoneNumber.trim().slice(0, 18),
                 emailAddress: (emailAddress || userEmail).trim(),
-                address: address.trim(),
-                emergencyContactName: emergencyContactName.trim(),
+                emergencyContactName: emergencyContactName.trim().slice(0, 80),
                 emergencyContactRelationship: emergencyContactRelationship.trim() || 'Contact',
-                emergencyContactPhone: emergencyContactPhone.trim(),
-                presentingProblem: presentingProblem.trim(),
+                emergencyContactPhone: emergencyContactPhone.trim().slice(0, 18),
+                presentingProblem: presentingProblem.trim().slice(0, 1000),
                 symptomDuration: symptomDuration.trim(),
-                treatmentGoals: treatmentGoals.trim(),
+                treatmentGoals: treatmentGoals.trim().slice(0, 500),
                 currentMedications: currentMedications.trim(),
                 allergies: allergies.trim(),
-                familyMentalHealthConditions: familyMentalHealthConditions.trim()
+                familyMentalHealthConditions: 'None'
             };
 
             await api.submitIntake(payload);
@@ -97,7 +119,7 @@ export default function IntakeScreen({ onComplete }) {
             const updatedUser = { ...currentUser, needsIntake: false, needsAssessment: true };
             await AsyncStorage.setItem('serene_user', JSON.stringify(updatedUser));
 
-            Alert.alert('Intake Completed', 'Your clinical intake form has been recorded.');
+            Alert.alert('Intake Completed', 'Your confidential intake profile has been created.');
             onComplete(updatedUser);
         } catch (err) {
             Alert.alert('Submission Error', err.message || 'Failed to submit intake questionnaire.');
@@ -110,9 +132,9 @@ export default function IntakeScreen({ onComplete }) {
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <Text style={styles.badge}>Step {step} of 3 • Patient Intake</Text>
-                    <Text style={styles.title}>Clinical Onboarding</Text>
-                    <Text style={styles.subtitle}>Confidential intake for personalized care planning</Text>
+                    <Text style={styles.badge}>Step {step} of 3 • Confidential Intake</Text>
+                    <Text style={styles.title}>Client Onboarding</Text>
+                    <Text style={styles.subtitle}>Streamlined information for your personalized care plan</Text>
                 </View>
 
                 <View style={styles.card}>
@@ -123,79 +145,98 @@ export default function IntakeScreen({ onComplete }) {
                             <Text style={styles.label}>Full Legal Name *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Jane Doe"
+                                placeholder="Abdullah Khan"
                                 value={fullLegalName}
                                 onChangeText={setFullLegalName}
+                                maxLength={80}
+                            />
+
+                            <Text style={styles.label}>Preferred Name (Optional)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="What should we call you?"
+                                value={preferredName}
+                                onChangeText={setPreferredName}
+                                maxLength={80}
                             />
 
                             <Text style={styles.label}>Date of Birth (YYYY-MM-DD) *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="1995-06-15"
+                                placeholder="2000-01-01"
                                 value={dateOfBirth}
                                 onChangeText={setDateOfBirth}
+                                maxLength={10}
                             />
 
-                            <Text style={styles.label}>Phone Number *</Text>
+                            <Text style={styles.label}>Gender Identity *</Text>
+                            <View style={styles.pillRow}>
+                                {GENDER_OPTIONS.map(opt => (
+                                    <TouchableOpacity
+                                        key={opt}
+                                        style={[styles.pill, genderSex === opt && styles.pillActive]}
+                                        onPress={() => setGenderSex(opt)}
+                                    >
+                                        <Text style={[styles.pillText, genderSex === opt && styles.pillTextActive]}>{opt}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.label}>Contact Phone Number *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="+1 555-0123"
+                                placeholder="0300-1234567"
                                 keyboardType="phone-pad"
                                 value={phoneNumber}
-                                onChangeText={setPhoneNumber}
+                                onChangeText={t => setPhoneNumber(sanitizePhone(t))}
+                                maxLength={16}
                             />
 
-                            <Text style={styles.label}>Email Address *</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="user@example.com"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={emailAddress}
-                                onChangeText={setEmailAddress}
-                            />
-
-                            <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(2)}>
-                                <Text style={styles.nextBtnText}>Next: Emergency Contact →</Text>
+                            <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+                                <Text style={styles.nextBtnText}>Continue to Step 2 →</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {step === 2 && (
                         <View>
-                            <Text style={styles.sectionTitle}>2. Emergency Contact Info</Text>
+                            <Text style={styles.sectionTitle}>2. Emergency Contact</Text>
+                            <Text style={styles.helperText}>Used only for clinical safety and urgent escalations.</Text>
 
-                            <Text style={styles.label}>Emergency Contact Full Name *</Text>
+                            <Text style={styles.label}>Contact Person Name *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="John Doe"
+                                placeholder="Sarah Khan"
                                 value={emergencyContactName}
                                 onChangeText={setEmergencyContactName}
+                                maxLength={80}
                             />
 
                             <Text style={styles.label}>Relationship *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Parent, Spouse, Friend..."
+                                placeholder="Sibling / Parent / Spouse / Friend"
                                 value={emergencyContactRelationship}
                                 onChangeText={setEmergencyContactRelationship}
+                                maxLength={50}
                             />
 
-                            <Text style={styles.label}>Emergency Contact Phone *</Text>
+                            <Text style={styles.label}>Emergency Phone Number *</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="+1 555-0199"
+                                placeholder="0312-3456789"
                                 keyboardType="phone-pad"
                                 value={emergencyContactPhone}
-                                onChangeText={setEmergencyContactPhone}
+                                onChangeText={t => setEmergencyContactPhone(sanitizePhone(t))}
+                                maxLength={16}
                             />
 
                             <View style={styles.btnRow}>
                                 <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
                                     <Text style={styles.backBtnText}>← Back</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.finishBtn} onPress={() => setStep(3)}>
-                                    <Text style={styles.finishBtnText}>Next: Concerns & Goals →</Text>
+                                <TouchableOpacity style={[styles.nextBtn, { flex: 1 }]} onPress={handleNext}>
+                                    <Text style={styles.nextBtnText}>Continue to Step 3 →</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -203,42 +244,49 @@ export default function IntakeScreen({ onComplete }) {
 
                     {step === 3 && (
                         <View>
-                            <Text style={styles.sectionTitle}>3. Concerns, Goals & Medical</Text>
+                            <Text style={styles.sectionTitle}>3. Clinical Focus & Goals</Text>
 
-                            <Text style={styles.label}>Primary Mental Health Concerns * (min 10 chars)</Text>
+                            <Text style={styles.label}>What brings you to SereneMind today? *</Text>
                             <TextInput
-                                style={styles.textArea}
+                                style={[styles.input, styles.textArea]}
+                                placeholder="Describe any stress, mood changes, anxiety, or challenges you are experiencing..."
                                 multiline
                                 numberOfLines={3}
-                                placeholder="Describe what brings you here today..."
                                 value={presentingProblem}
                                 onChangeText={setPresentingProblem}
+                                maxLength={1000}
                             />
 
-                            <Text style={styles.label}>Treatment Goals * (min 10 chars)</Text>
+                            <Text style={styles.label}>How long have you felt this way?</Text>
+                            <View style={styles.pillRow}>
+                                {DURATION_OPTIONS.map(dur => (
+                                    <TouchableOpacity
+                                        key={dur}
+                                        style={[styles.pill, symptomDuration === dur && styles.pillActive]}
+                                        onPress={() => setSymptomDuration(dur)}
+                                    >
+                                        <Text style={[styles.pillText, symptomDuration === dur && styles.pillTextActive]}>{dur}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.label}>What are your main goals for therapy?</Text>
                             <TextInput
-                                style={styles.textArea}
+                                style={[styles.input, styles.textArea]}
+                                placeholder="e.g. Better emotional control, reduced anxiety, improved sleep..."
                                 multiline
-                                numberOfLines={3}
-                                placeholder="What changes or outcomes do you hope to achieve?"
+                                numberOfLines={2}
                                 value={treatmentGoals}
                                 onChangeText={setTreatmentGoals}
-                            />
-
-                            <Text style={styles.label}>Current Medications or Allergies</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g., None, or list medications..."
-                                value={currentMedications}
-                                onChangeText={setCurrentMedications}
+                                maxLength={500}
                             />
 
                             <View style={styles.btnRow}>
                                 <TouchableOpacity style={styles.backBtn} onPress={() => setStep(2)}>
                                     <Text style={styles.backBtnText}>← Back</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={loading}>
-                                    {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.finishBtnText}>Submit & Continue</Text>}
+                                <TouchableOpacity style={[styles.finishBtn, { flex: 1 }]} onPress={handleFinish} disabled={loading}>
+                                    {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.finishBtnText}>Submit & Start Screening ✓</Text>}
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -255,31 +303,29 @@ const styles = StyleSheet.create({
         backgroundColor: '#E8E8E8'
     },
     scrollContent: {
-        padding: 20
+        padding: 16
     },
     header: {
         alignItems: 'center',
-        marginVertical: 20
+        marginVertical: 14
     },
     badge: {
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: 'bold',
         color: '#0E7C7B',
-        backgroundColor: '#C2FFF0',
+        backgroundColor: '#D1F2EB',
         paddingHorizontal: 12,
         paddingVertical: 4,
         borderRadius: 12,
-        marginBottom: 8,
-        textTransform: 'uppercase'
+        marginBottom: 6
     },
     title: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: 'bold',
-        color: '#0D1B2A',
-        textAlign: 'center'
+        color: '#0D1B2A'
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#3D5A80',
         textAlign: 'center',
         marginTop: 4
@@ -290,49 +336,74 @@ const styles = StyleSheet.create({
         padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 6,
         elevation: 3
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: 'bold',
-        color: '#0D1B2A',
-        marginBottom: 16
+        color: '#0E7C7B',
+        marginBottom: 12
+    },
+    helperText: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginBottom: 12
     },
     label: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#3D5A80',
-        marginBottom: 6,
-        marginTop: 8
+        color: '#0D1B2A',
+        marginTop: 10,
+        marginBottom: 6
     },
     input: {
-        backgroundColor: '#F8FAF9',
+        backgroundColor: '#F8F9FA',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
+        borderColor: '#E2E8F0',
         borderRadius: 12,
         padding: 12,
         fontSize: 14,
         color: '#0D1B2A'
     },
     textArea: {
-        backgroundColor: '#F8FAF9',
+        minHeight: 70,
+        textAlignVertical: 'top'
+    },
+    pillRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginVertical: 4
+    },
+    pill: {
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 20,
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
-        borderRadius: 12,
-        padding: 12,
-        fontSize: 14,
-        textAlignVertical: 'top',
-        color: '#0D1B2A',
-        minHeight: 70
+        borderColor: '#E2E8F0'
+    },
+    pillActive: {
+        backgroundColor: '#0E7C7B',
+        borderColor: '#0E7C7B'
+    },
+    pillText: {
+        fontSize: 12,
+        color: '#475569',
+        fontWeight: '500'
+    },
+    pillTextActive: {
+        color: '#FFFFFF',
+        fontWeight: 'bold'
     },
     nextBtn: {
         backgroundColor: '#0E7C7B',
+        borderRadius: 14,
         paddingVertical: 14,
-        borderRadius: 12,
         alignItems: 'center',
-        marginTop: 24
+        marginTop: 20
     },
     nextBtnText: {
         color: '#FFFFFF',
@@ -342,28 +413,29 @@ const styles = StyleSheet.create({
     btnRow: {
         flexDirection: 'row',
         gap: 12,
-        marginTop: 24
+        marginTop: 20
     },
     backBtn: {
-        flex: 1,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 14,
         paddingVertical: 14,
-        borderRadius: 12,
-        backgroundColor: '#F0F4F8',
+        paddingHorizontal: 18,
         alignItems: 'center'
     },
     backBtnText: {
-        color: '#3D5A80',
-        fontWeight: '600'
+        color: '#334155',
+        fontWeight: '600',
+        fontSize: 14
     },
     finishBtn: {
-        flex: 2,
-        paddingVertical: 14,
-        borderRadius: 12,
         backgroundColor: '#0E7C7B',
+        borderRadius: 14,
+        paddingVertical: 14,
         alignItems: 'center'
     },
     finishBtnText: {
         color: '#FFFFFF',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        fontSize: 15
     }
 });

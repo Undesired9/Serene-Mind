@@ -104,24 +104,69 @@ export default function SettingsScreen({ onLogout }) {
                 {/* Server Endpoint Settings */}
                 <View style={[styles.card, darkMode && styles.darkCard]}>
                     <Text style={[styles.cardTitle, darkMode && styles.darkText]}>Backend Server Configuration</Text>
-                    <Text style={styles.label}>API Base URL</Text>
+                    <Text style={styles.label}>Quick Presets</Text>
+                    <View style={styles.presetRow}>
+                        <TouchableOpacity 
+                            style={[styles.presetBtn, apiUrl.includes('vercel') && styles.presetBtnActive]}
+                            onPress={() => { setApiUrlState('https://serenemind.vercel.app/api'); setApiBaseUrl('https://serenemind.vercel.app/api'); }}
+                        >
+                            <Text style={[styles.presetBtnText, apiUrl.includes('vercel') && styles.presetBtnTextActive]}>☁️ Vercel Cloud</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.presetBtn, apiUrl.includes('localhost') && styles.presetBtnActive]}
+                            onPress={() => { setApiUrlState('http://localhost:5000/api'); setApiBaseUrl('http://localhost:5000/api'); }}
+                        >
+                            <Text style={[styles.presetBtnText, apiUrl.includes('localhost') && styles.presetBtnTextActive]}>💻 Localhost</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.presetBtn, apiUrl.includes('10.0.2.2') && styles.presetBtnActive]}
+                            onPress={() => { setApiUrlState('http://10.0.2.2:5000/api'); setApiBaseUrl('http://10.0.2.2:5000/api'); }}
+                        >
+                            <Text style={[styles.presetBtnText, apiUrl.includes('10.0.2.2') && styles.presetBtnTextActive]}>📱 Android</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <Text style={[styles.label, { marginTop: 12 }]}>Custom API Base URL</Text>
                     <TextInput
                         style={[styles.input, darkMode && styles.darkInput]}
                         value={apiUrl}
                         onChangeText={setApiUrlState}
-                        placeholder="http://localhost:5000/api"
+                        placeholder="https://serenemind.vercel.app/api"
                         autoCapitalize="none"
                     />
                     <TouchableOpacity style={styles.saveUrlBtn} onPress={handleSaveApiUrl}>
-                        <Text style={styles.saveUrlText}>Save API Server URL</Text>
+                        <Text style={styles.saveUrlText}>Save Custom Server URL</Text>
                     </TouchableOpacity>
+                </View>
+
+                {/* Pakistani Helplines Directory Card */}
+                <View style={[styles.card, darkMode && styles.darkCard]}>
+                    <Text style={[styles.cardTitle, darkMode && styles.darkText]}>🇵🇰 Emergency Support (Pakistan)</Text>
+                    <View style={styles.helplineList}>
+                        <View style={styles.helplineRow}>
+                            <Text style={styles.helplineLabel}>Umang Mental Health 24/7</Text>
+                            <Text style={styles.helplineNum}>0311-7786264</Text>
+                        </View>
+                        <View style={styles.helplineRow}>
+                            <Text style={styles.helplineLabel}>Emergency Rescue</Text>
+                            <Text style={styles.helplineNum}>1122</Text>
+                        </View>
+                        <View style={styles.helplineRow}>
+                            <Text style={styles.helplineLabel}>Rozan Emotional Helpline</Text>
+                            <Text style={styles.helplineNum}>0304-1111741</Text>
+                        </View>
+                        <View style={styles.helplineRow}>
+                            <Text style={styles.helplineLabel}>Taskeen Mental Health</Text>
+                            <Text style={styles.helplineNum}>0316-8275336</Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* App Information Card */}
                 <View style={[styles.card, darkMode && styles.darkCard]}>
                     <Text style={[styles.cardTitle, darkMode && styles.darkText]}>About SereneMind</Text>
-                    <Text style={styles.infoText}>Version 1.0.0 (Native Expo Application)</Text>
-                    <Text style={styles.infoText}>Privacy-First AI Companion & Clinical Triage</Text>
+                    <Text style={styles.infoText}>Version 1.0.0 (Expo SDK 54 Native)</Text>
+                    <Text style={styles.infoText}>Privacy-First AI Psychotherapist & Clinical Triage</Text>
                 </View>
 
                 {/* Logout Button */}
@@ -294,17 +339,67 @@ const styles = StyleSheet.create({
         color: '#3D5A80',
         marginBottom: 4
     },
-    logoutBtn: {
-        backgroundColor: '#FEE2E2',
+    presetRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 8
+    },
+    presetBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
         borderWidth: 1,
-        borderColor: '#F87171',
+        borderColor: '#E2E8F0',
+        alignItems: 'center'
+    },
+    presetBtnActive: {
+        backgroundColor: '#0E7C7B',
+        borderColor: '#0E7C7B'
+    },
+    presetBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#475569'
+    },
+    presetBtnTextActive: {
+        color: '#FFFFFF',
+        fontWeight: 'bold'
+    },
+    helplineList: {
+        gap: 6
+    },
+    helplineRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0'
+    },
+    helplineLabel: {
+        fontSize: 12,
+        color: '#334155',
+        fontWeight: '500'
+    },
+    helplineNum: {
+        fontSize: 12,
+        color: '#0E7C7B',
+        fontWeight: 'bold'
+    },
+    logoutBtn: {
+        backgroundColor: '#E63946',
         paddingVertical: 14,
         borderRadius: 14,
         alignItems: 'center',
-        marginTop: 12
+        marginTop: 12,
+        marginBottom: 30
     },
     logoutBtnText: {
-        color: '#DC2626',
+        color: '#FFFFFF',
         fontWeight: 'bold',
         fontSize: 15
     }

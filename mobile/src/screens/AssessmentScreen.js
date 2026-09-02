@@ -140,8 +140,32 @@ export default function AssessmentScreen({ onComplete }) {
                 ))}
 
                 <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Complete Assessment</Text>}
+                    {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Complete & Calibrate Engine ✓</Text>}
                 </TouchableOpacity>
+
+                {/* Pakistani Crisis Support Resources */}
+                <View style={styles.crisisCard}>
+                    <Text style={styles.crisisHeader}>🇵🇰 Immediate Crisis & Emotional Support (Pakistan)</Text>
+                    <Text style={styles.crisisSub}>If you are in acute distress or having thoughts of self-harm, please reach out immediately:</Text>
+                    <View style={styles.helplineList}>
+                        <View style={styles.helplineItem}>
+                            <Text style={styles.helplineName}>Umang Mental Health 24/7:</Text>
+                            <Text style={styles.helplineNumber}>0311-7786264</Text>
+                        </View>
+                        <View style={styles.helplineItem}>
+                            <Text style={styles.helplineName}>Emergency Medical / Rescue:</Text>
+                            <Text style={styles.helplineNumber}>1122</Text>
+                        </View>
+                        <View style={styles.helplineItem}>
+                            <Text style={styles.helplineName}>Rozan Emotional Helpline:</Text>
+                            <Text style={styles.helplineNumber}>0304-1111741</Text>
+                        </View>
+                        <View style={styles.helplineItem}>
+                            <Text style={styles.helplineName}>Taskeen Mental Health:</Text>
+                            <Text style={styles.helplineNumber}>0316-8275336</Text>
+                        </View>
+                    </View>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -235,11 +259,55 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 14,
         alignItems: 'center',
-        marginVertical: 24
+        marginVertical: 18
     },
     submitBtnText: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold'
+    },
+    crisisCard: {
+        backgroundColor: '#FFF1F2',
+        borderWidth: 1,
+        borderColor: '#FECDD3',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 30
+    },
+    crisisHeader: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#BE123C',
+        marginBottom: 6
+    },
+    crisisSub: {
+        fontSize: 12,
+        color: '#881337',
+        marginBottom: 10,
+        lineHeight: 16
+    },
+    helplineList: {
+        gap: 6
+    },
+    helplineItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFE4E6'
+    },
+    helplineName: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#9F1239'
+    },
+    helplineNumber: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#0E7C7B'
     }
 });

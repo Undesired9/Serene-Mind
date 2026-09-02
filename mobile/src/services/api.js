@@ -1,10 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Default API Base URL (adjust localhost for Android emulator / local Wi-Fi IP as needed)
-const API_BASE_URL = 'http://localhost:5000/api';
+// Default API Base URL (defaults to production Vercel deployment with fallback)
+export const DEFAULT_API_URLS = {
+    vercel: 'https://serenemind.vercel.app/api',
+    local: 'http://localhost:5000/api',
+    androidEmulator: 'http://10.0.2.2:5000/api'
+};
+
+const API_BASE_URL = DEFAULT_API_URLS.vercel;
 
 export const setApiBaseUrl = async (url) => {
-    await AsyncStorage.setItem('serene_api_url', url);
+    const cleanUrl = url.trim().replace(/\/+$/, '');
+    await AsyncStorage.setItem('serene_api_url', cleanUrl);
 };
 
 export const getApiBaseUrl = async () => {
@@ -58,11 +65,14 @@ export const api = {
     // Chat
     getSessions: () => request('/chat/sessions'),
     createSession: () => request('/chat/sessions', { method: 'POST' }),
+    deleteSession: (sessionId) => request(`/chat/sessions/${sessionId}`, { method: 'DELETE' }),
     getMessages: (sessionId) => request(`/chat/sessions/${sessionId}/history`),
     sendMessage: (sessionId, message, locale = 'en') => request('/chat', {
         method: 'POST',
-        body: JSON.stringify({ sessionId, message, locale })
+        body: JSON.stringify({ sessionId, message, locale, stream: false })
     }),
+    unlockChat: () => request('/chat/unlock', { method: 'POST' }),
+    getEscalationStatus: () => request('/chat/escalation-status'),
 
     // Appointments
     getDoctors: () => request('/appointments/doctors'),

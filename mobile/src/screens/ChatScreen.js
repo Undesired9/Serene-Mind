@@ -91,10 +91,13 @@ export default function ChatScreen() {
                 };
                 setMessages(prev => [...prev, botMsg]);
             }
-            if (res.isCrisis || res.riskTier === 'CRITICAL' || res.escalationStatus?.is_chat_locked) {
+            if (res.isCrisis || res.riskTier === 'CRITICAL') {
                 Alert.alert(
-                    'Clinical Safety Alert',
-                    'Your safety is our top priority. If you are experiencing immediate distress, please call or text 988 (Suicide & Crisis Lifeline) or contact emergency services.'
+                    '🇵🇰 Clinical Safety Support',
+                    'Your safety is our highest priority. Please contact the Umang Mental Health Helpline (0311-7786264), Rescue 1122, or reach out to a doctor immediately.',
+                    [
+                        { text: 'Close', style: 'cancel' }
+                    ]
                 );
             }
         } catch (err) {
@@ -102,6 +105,37 @@ export default function ChatScreen() {
         } finally {
             setSending(false);
         }
+    };
+
+    const handleUnlockChat = async () => {
+        try {
+            await api.unlockChat();
+            Alert.alert('Chat Resumed', 'You may continue your therapeutic conversation.');
+        } catch (e) {
+            console.warn('Unlock chat error', e);
+        }
+    };
+
+    const handleDeleteSession = async (sessionId) => {
+        Alert.alert(
+            'Delete Session',
+            'Are you sure you want to delete this conversation?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await api.deleteSession(sessionId);
+                            loadSessions();
+                        } catch (err) {
+                            Alert.alert('Error', 'Could not delete session.');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleMicToggle = () => {
