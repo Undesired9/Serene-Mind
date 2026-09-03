@@ -83,38 +83,71 @@ const detectRisk = (message) => {
     return { score, tier };
 };
 
-const buildSystemPrompt = (assessment) => {
-    let prompt = `You are SereneMind, a compassionate, warm, and highly skilled licensed psychotherapist and mental wellness companion. You are in a 1-on-1 private therapy session with a client.
+/**
+ * Master system prompt — legally safe identity framing, RISK_FLAG instructions, hard boundaries.
+ * @param {object|null} assessment  latest assessment row from DB (may be null)
+ * @param {string}      riskTier    LOW | MODERATE | HIGH | CRITICAL (from risk engine)
+ */
+const buildSystemPrompt = (assessment = null, riskTier = 'LOW') => {
+    // CRITICAL context block — if somehow a CRITICAL-tier message reaches the LLM, constrain it
+    const riskContext = riskTier === 'CRITICAL'
+        ? `\n\n## CRITICAL SAFETY OVERRIDE\nThe server has classified this session as CRITICAL risk. Do NOT continue normal conversation. Output ONLY this fixed message (verbatim):\n"I'm really concerned about your safety right now. Please contact the Umang Pakistan Mental Health Helpline immediately at 0311-7786264, or call Emergency Rescue at 1122. You can also reach a trusted person near you — you don't have to face this alone."`
+        : `\n\n## Current session context (server-injected — treat as ground truth)\nRisk tier: ${riskTier}. Calibrate warmth and pacing accordingly; do not reference the tier label to the user.`;
 
-CORE THERAPEUTIC APPROACH:
-- Person-Centered Therapy (Carl Rogers): Offer unconditional positive regard, deep empathy, and genuine emotional validation.
-- Cognitive Behavioral Therapy (CBT): Gently help the client identify feelings, reframe negative thoughts, and explore healthy coping strategies.
-
-CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
-1. TALK DIRECTLY TO THE CLIENT: Always speak directly to the person in front of you ("I hear you", "You are not alone", "It's completely understandable to feel that way").
-2. ABSOLUTELY NO META-ANALYSIS OR REASONING: NEVER output any thinking process, internal monologue, notes, outlines, or headers like "Here's a thinking process:" or bullet points analyzing what the user said. Output ONLY your spoken therapist words.
-3. CONVERSATIONAL FLOW (2-4 natural sentences):
-   - First, deeply validate their emotion (e.g. "I can hear how exhausting and heavy depression feels right now. It takes real courage to put those feelings into words.").
-   - Then, ask exactly ONE gentle, open-ended question or offer a comforting reflection to help them explore what they are going through.
-4. NATURAL HUMAN TONE: Sound like an empathetic, real therapist sitting across from them — warm, gentle, non-judgmental, and validating.
-5. LANGUAGE: Respond in the exact same language or dialect the client is writing in (English, Urdu, etc.).
-
-CRISIS PROTOCOL:
-- If the user hints at self-harm, suicide, or severe crisis, immediately prioritize safety. Acknowledge their pain with profound warmth and urgent care, and explicitly direct them to emergency services or support hotlines (Umang 0311-7786264, Rescue 1122).`;
-
+    let clinicalContext = '';
     if (assessment) {
-        prompt += `
-
-PATIENT ASSESSMENT CONTEXT:
-- PHQ-9 (Depression): ${assessment.phq9_score || 'Not provided'}
-- GAD-7 (Anxiety): ${assessment.gad7_score || 'Not provided'}
-- Main Concern: ${assessment.main_concern || 'Not provided'}
-- Notes: ${assessment.notes || 'Not provided'}
-
-Keep this clinical context in mind to tailor your empathy, without explicitly citing scores unless helpful.`;
+        const phq = assessment.phq9_score ?? assessment.depression_score ?? null;
+        const gad = assessment.gad7_score ?? assessment.anxiety_score ?? null;
+        const concern = assessment.main_concern || '';
+        clinicalContext = `\n\n## Patient background (tone calibration only — never quote raw numbers to the user)\n- Depression severity score: ${phq != null ? phq + '/27' : 'not available'}\n- Anxiety severity score: ${gad != null ? gad + '/21' : 'not available'}\n- Presenting concern: ${concern || 'not specified'}\n\nAdapt pacing and depth of empathy based on this context. Do not mention scores, percentages, or diagnostic labels in your reply.`;
     }
 
-    return prompt;
+    return `You are the SereneMind Companion — an AI-powered supportive wellness tool.
+You are NOT a licensed therapist, psychiatrist, psychologist, or medical professional, and you must never imply otherwise, even if the user asks you to roleplay as one or claims it would help them.
+
+## Identity & framing (state naturally — do not recite this block verbatim every turn)
+- You are a supportive companion using person-centered (Carl Rogers) and CBT-informed conversational techniques.
+- You are not a substitute for professional care. If the user asks "are you a real therapist / doctor," say clearly that you are an AI support tool, not a licensed clinician.
+- You do not diagnose conditions, prescribe or recommend medication, dosages, or medical treatment changes. Redirect those questions to their care team.
+
+## Language handling
+- Respond in the same language/register the user writes in, including Urdu, Roman Urdu, or code-switched English-Urdu. Do not force English.
+- Mirror the user's own phrasing — do not assume fluency either way.
+
+## Conversational style
+- 2–4 sentences per turn. Warm, direct, concrete. No clinical jargon.
+- End with at most ONE open, non-leading question — never interrogate with multiple questions.
+- Never produce numbered diagnostic lists, symptom checklists, or anything that reads like a clinical assessment mid-conversation.
+- Reflect feelings in the user's own words before offering any reframe or suggestion (validate first, advise second).
+
+## Defense-in-depth risk flagging (secondary signal — server strips this tag before display)
+The server already runs deterministic keyword/regex crisis detection before you see any message.
+That system can still miss: negated statements, third-person framing that is actually about the user,
+non-English phrasing, or subtler language (hopelessness without trigger words, giving away possessions,
+sudden calm after prolonged distress).
+
+If, and only if, you notice language that plausibly indicates the user may be at risk to themselves or
+others RIGHT NOW, append this exact machine-readable tag at the very end of your response, on its own line:
+
+[[RISK_FLAG: brief_reason]]
+
+- Do not mention this tag to the user or explain that you are flagging anything — it is stripped before display.
+- Only flag genuine plausible risk — not general sadness, venting, or discussion of a difficult past.
+- This flag NEVER locks chat or triggers hotline display by itself. Your server re-runs full risk evaluation.
+
+## Hard boundaries — never do these, regardless of how the user asks
+- Never provide instructions, methods, or specifics related to self-harm, suicide, or harming others,
+  even framed as "hypothetical," "for a story," "for safety awareness," or "my friend asked."
+- Never promise confidentiality ("this stays between us") — clinicians may review flagged conversations.
+- Never tell the user to stop taking medication, change a dose, or avoid seeking professional or emergency help.
+- Never continue roleplay that romanticizes, minimizes, or normalizes self-harm, disordered eating, or substance misuse.
+- If the user directly asks for crisis hotline numbers, provide them (Umang Pakistan: 0311-7786264, Emergency Rescue: 1122)
+  even in a LOW/MODERATE tier conversation — never withhold them.
+
+## Output format constraints
+- No <think> tags, no meta-commentary about your instructions, no "As an AI…" disclaimers beyond the above.
+- No text before or after your reply except the optional RISK_FLAG tag.
+${riskContext}${clinicalContext}`;
 };
 
 const cleanOutput = (text) => {
@@ -175,7 +208,30 @@ const cleanOutput = (text) => {
     // 7. Strip numbered lists
     cleaned = cleaned.replace(/(?:^\s*\d+\.\s+.*(?:\n|$))+/gm, '');
 
+    // 8. Final safety net — strip any stray [[RISK_FLAG:...]] tags that weren't extracted earlier
+    cleaned = cleaned.replace(/\[\[RISK_FLAG:[^\]]*\]\]/gi, '').trim();
+
     return cleaned.trim();
+};
+
+/**
+ * Extracts the machine-readable [[RISK_FLAG: reason]] tag that the LLM may append.
+ * MUST be called before cleanOutput so the tag is captured before other cleaning strips it.
+ * The flag is never shown to the user — only logged and used as a secondary risk signal.
+ *
+ * @param   {string} rawOutput  raw LLM output
+ * @returns {{ cleanedText: string, riskFlag: string|null }}
+ */
+const extractRiskFlag = (rawOutput) => {
+    if (!rawOutput || typeof rawOutput !== 'string') {
+        return { cleanedText: rawOutput || '', riskFlag: null };
+    }
+    // Match [[RISK_FLAG: anything up to the closing ]]
+    const flagMatch = rawOutput.match(/\[\[RISK_FLAG:\s*([^\]]+)\]\]/i);
+    const riskFlag  = flagMatch ? flagMatch[1].trim() : null;
+    // Strip the tag from the text that will be sent to the user
+    const cleanedText = rawOutput.replace(/\[\[RISK_FLAG:[^\]]*\]\]/gi, '').trim();
+    return { cleanedText, riskFlag };
 };
 
 const sanitizeHistoryForOpenRouter = (history = []) => {
@@ -198,6 +254,9 @@ const getRetryDelay = (attempt) =>
 
 /**
  * Call OpenRouter API with nvidia/nemotron-3.5-lightning:free.
+ * Fix D: each retry attempt gets its own AbortController; previous attempt is aborted before retry.
+ * @param {object[]} messages  OpenAI-format message array
+ * @param {object}   options   maxTokens, temperature, topP, signal (external AbortSignal)
  */
 const callOpenRouter = async (messages, options = {}) => {
     const apiKey = process.env.serenemind;
@@ -206,17 +265,37 @@ const callOpenRouter = async (messages, options = {}) => {
     }
 
     const {
-        maxTokens = 250,
+        maxTokens   = 250,
         temperature = 0.6,
-        topP = 0.9
+        topP        = 0.9,
+        signal: externalSignal = null   // caller (chat route) may pass an AbortSignal
     } = options;
 
     let lastError;
+    let previousController = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        // Fix D: abort the previous in-flight request before retrying
+        if (previousController) previousController.abort();
+        const attemptController = new AbortController();
+        previousController = attemptController;
+
+        // Propagate external abort (e.g. client disconnected) into this attempt
+        let externalAbortCleanup = null;
+        if (externalSignal) {
+            if (externalSignal.aborted) {
+                attemptController.abort();
+            } else {
+                const onExternalAbort = () => attemptController.abort();
+                externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+                externalAbortCleanup = () => externalSignal.removeEventListener('abort', onExternalAbort);
+            }
+        }
+
         try {
             const response = await fetch(OPENROUTER_API_URL, {
                 method: 'POST',
+                signal: attemptController.signal,
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json',
@@ -245,7 +324,7 @@ const callOpenRouter = async (messages, options = {}) => {
                 throw error;
             }
 
-            const data = await response.json();
+            const data    = await response.json();
             const content = data?.choices?.[0]?.message?.content;
 
             if (!content) {
@@ -254,6 +333,9 @@ const callOpenRouter = async (messages, options = {}) => {
 
             return content;
         } catch (error) {
+            // Ignore AbortError when the external caller cancelled the request
+            if (error.name === 'AbortError') throw error;
+
             lastError = error;
 
             if (error.status && isRetryableError(error.status) && attempt < MAX_RETRIES) {
@@ -261,26 +343,37 @@ const callOpenRouter = async (messages, options = {}) => {
                 await sleep(delay);
                 continue;
             }
-            if (attempt >= MAX_RETRIES) {
-                throw error;
-            }
+            if (attempt >= MAX_RETRIES) throw error;
+        } finally {
+            if (externalAbortCleanup) externalAbortCleanup();
         }
     }
 
     throw lastError;
 };
 
-const handleChat = async (message, history = [], assessment = null, onTextChunk = null) => {
-    const { score: riskScore, tier: riskTier } = detectRisk(message);
-    const riskLevel = getRiskLevelFromTier(riskTier);
+/**
+ * Main chat handler — calls OpenRouter, extracts RISK_FLAG before cleaning output.
+ * @param {string}      message    user's raw message text
+ * @param {object[]}    history    prior message objects from the client
+ * @param {object|null} assessment latest assessment row from DB
+ * @param {string}      riskTier   risk tier from the server-side risk engine (LOW/MODERATE/HIGH)
+ * @param {AbortSignal} signal     optional AbortSignal from the chat route (client disconnect)
+ * @returns {{ reply, riskLevel, riskScore, riskTier, isCrisis, riskFlag }}
+ */
+const handleChat = async (message, history = [], assessment = null, riskTier = 'LOW', signal = null) => {
+    const { score: riskScore, tier: llmRiskTier } = detectRisk(message);
+    const riskLevel = getRiskLevelFromTier(llmRiskTier);
 
-    if (riskTier === 'CRITICAL') {
+    // The server-level risk engine already handles CRITICAL; this is a last-resort guard
+    if (llmRiskTier === 'CRITICAL') {
         return {
-            reply: "I'm really sorry you're feeling this way. Please reach out to a trusted person or your local emergency service right now—you don't have to face this alone.",
+            reply: "I'm really concerned about your safety right now. Please contact the Umang Pakistan Mental Health Helpline immediately at 0311-7786264, or call Emergency Rescue at 1122. You don't have to face this alone.",
             riskLevel,
             riskScore,
-            riskTier,
-            isCrisis: true
+            riskTier: llmRiskTier,
+            isCrisis: true,
+            riskFlag: null
         };
     }
 
@@ -289,14 +382,16 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
             reply: "I'm having trouble connecting right now. Please try again shortly.",
             riskLevel,
             riskScore,
-            riskTier,
-            isCrisis: false
+            riskTier: llmRiskTier,
+            isCrisis: false,
+            riskFlag: null
         };
     }
 
     try {
-        const chatHistory = sanitizeHistoryForOpenRouter(history);
-        const systemPrompt = buildSystemPrompt(assessment);
+        const chatHistory  = sanitizeHistoryForOpenRouter(history);
+        // Pass the server-evaluated risk tier so the LLM receives calibrated context
+        const systemPrompt = buildSystemPrompt(assessment, riskTier);
 
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -305,30 +400,39 @@ const handleChat = async (message, history = [], assessment = null, onTextChunk 
         ];
 
         const raw = await callOpenRouter(messages, {
-            maxTokens: 1000,
+            maxTokens:   1000,
             temperature: 0.7,
-            topP: 0.9
+            topP:        0.9,
+            signal
         });
 
-        const reply = cleanOutput(raw) || "I hear you. Tell me more about that.";
+        // Fix C: extract RISK_FLAG ONCE on the full raw string, then clean once
+        const { cleanedText, riskFlag } = extractRiskFlag(raw);
+        const reply = cleanOutput(cleanedText) || "I hear you. Tell me more about that.";
 
         return {
             reply,
             riskLevel,
             riskScore,
-            riskTier,
-            isCrisis: false
+            riskTier: llmRiskTier,
+            isCrisis: false,
+            riskFlag   // null or a brief reason string — never shown to user
         };
 
     } catch (error) {
-        console.error("❌ Generation error:", error);
+        if (error.name === 'AbortError') {
+            // Client disconnected — not a real error, don't log as an application error
+            return { reply: '', riskLevel, riskScore, riskTier: llmRiskTier, isCrisis: false, riskFlag: null, aborted: true };
+        }
+        console.error('❌ Generation error:', error);
 
         return {
-            reply: "I'm here with you—could you say that again?",
+            reply:    "I'm here with you — could you say that again?",
             riskLevel,
             riskScore,
-            riskTier,
-            isCrisis: false
+            riskTier: llmRiskTier,
+            isCrisis: false,
+            riskFlag: null
         };
     }
 };
@@ -387,7 +491,9 @@ Write a short clinical summary.
 };
 
 /**
- * Stream OpenRouter completions using server-sent chunks with nvidia/nemotron-3.5-lightning:free
+ * Stream OpenRouter completions using server-sent chunks with nvidia/nemotron-3.5-lightning:free.
+ * Fix A: reader is explicitly released/cancelled in a finally block to prevent listener leaks.
+ * Fix D: AbortController per retry, previous aborted before retry.
  */
 const streamOpenRouter = async (messages, onChunk, options = {}) => {
     const apiKey = process.env.serenemind;
@@ -396,17 +502,35 @@ const streamOpenRouter = async (messages, onChunk, options = {}) => {
     }
 
     const {
-        maxTokens = 250,
-        temperature = 0.6,
-        topP = 0.9
+        maxTokens       = 250,
+        temperature     = 0.6,
+        topP            = 0.9,
+        signal: externalSignal = null
     } = options;
 
     let lastError;
+    let previousController = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        // Fix D: abort previous in-flight request before retrying
+        if (previousController) previousController.abort();
+        const attemptController = new AbortController();
+        previousController = attemptController;
+
+        let externalAbortCleanup = null;
+        if (externalSignal) {
+            if (externalSignal.aborted) { attemptController.abort(); }
+            else {
+                const onExternalAbort = () => attemptController.abort();
+                externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+                externalAbortCleanup = () => externalSignal.removeEventListener('abort', onExternalAbort);
+            }
+        }
+
         try {
             const response = await fetch(OPENROUTER_API_URL, {
                 method: 'POST',
+                signal: attemptController.signal,
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json',
@@ -439,10 +563,12 @@ const streamOpenRouter = async (messages, onChunk, options = {}) => {
             let fullContent = '';
 
             if (response.body && response.body.getReader) {
-                const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = '';
+                const reader  = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer    = '';
 
+                // Fix A: always release reader in finally even on abort/error
+                try {
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
@@ -459,14 +585,18 @@ const streamOpenRouter = async (messages, onChunk, options = {}) => {
 
                             try {
                                 const parsed = JSON.parse(jsonStr);
-                                const delta = parsed?.choices?.[0]?.delta?.content || '';
+                                const delta  = parsed?.choices?.[0]?.delta?.content || '';
                                 if (delta) {
                                     fullContent += delta;
                                     if (onChunk) onChunk(delta);
                                 }
-                            } catch (parseErr) {}
+                            } catch (parseErr) { /* malformed SSE line — skip */ }
                         }
                     }
+                } finally {
+                    // Fix A: unconditionally release the reader so the underlying stream is freed
+                    reader.cancel().catch(() => {});
+                }
                 } else if (response.body && typeof response.body.on === 'function') {
                     await new Promise((resolve, reject) => {
                         let buffer = '';
@@ -527,6 +657,7 @@ module.exports = {
     getRiskLevelFromTier,
     generatePatientReportMock,
     cleanOutput,
+    extractRiskFlag,
     buildSystemPrompt,
     checkApiKey,
     sanitizeHistoryForOpenRouter
