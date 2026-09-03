@@ -256,10 +256,16 @@ async function getUserAssessment(userId) {
 router.post('/', verifyToken, async (req, res) => {
     let { message, history, sessionId, stream = true } = req.body;
     const userId = req.user.id;
-    
+
     if (!message) {
         return res.status(400).json({ error: 'Message is required' });
     }
+
+    // Fix A & E: one AbortController per request — cancelled if client disconnects mid-stream
+    const controller = new AbortController();
+    const abortSignal = controller.signal;
+    const onClientClose = () => controller.abort();
+    req.on('close', onClientClose);
 
     try {
         // Multi-Signal Risk Evaluation (Deterministic Preprocessor)
@@ -272,8 +278,8 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 1. Instantly save the user's message to the SQL DB
         await new Promise((resolve, reject) => {
-            db.run(`INSERT INTO Sessions (user_id, sender, content, session_id) VALUES (?, 'user', ?, ?)`, 
-            [userId, message, sessionId], 
+            db.run(`INSERT INTO Sessions (user_id, sender, content, session_id) VALUES (?, 'user', ?, ?)`,
+            [userId, message, sessionId],
             function(err) {
                 if (err) reject(err);
                 resolve();
@@ -284,11 +290,11 @@ router.post('/', verifyToken, async (req, res) => {
 
         // 2. If Critical Risk flagged on active message, send safe crisis fallback immediately
         if (isCritical) {
-            const crisisReply = "I’m hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the Umang Pakistan Mental Health Helpline (call 0311-7786264), call Rescue 1122, or reach out to a trusted loved one or emergency doctor immediately. You do not have to carry this alone.";
-            
+            const crisisReply = "I'm hearing how painful and difficult things are for you right now. Your safety is our highest priority. Please contact the Umang Pakistan Mental Health Helpline (call 0311-7786264), call Rescue 1122, or reach out to a trusted loved one or emergency doctor immediately. You do not have to carry this alone.";
+
             await new Promise((resolve, reject) => {
-                db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, 'CRITICAL', 95, ?)`, 
-                [userId, crisisReply, sessionId], 
+                db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, 'CRITICAL', 95, ?)`,
+                [userId, crisisReply, sessionId],
                 function(err) {
                     if (err) reject(err);
                     resolve();
@@ -299,23 +305,23 @@ router.post('/', verifyToken, async (req, res) => {
             const updatedStatus = await getOrCreateUserEscalationStatus(userId);
             const interventions = getRecommendedInterventions('CRITICAL', message);
 
-            if (wantsStream) {
+            if (wantsStream && !res.writableEnded) {
                 res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
                 res.setHeader('Cache-Control', 'no-cache, no-transform');
                 res.setHeader('Connection', 'keep-alive');
                 res.flushHeaders?.();
 
                 res.write(`data: ${JSON.stringify({ chunk: crisisReply })}\n\n`);
-                res.write(`data: ${JSON.stringify({ 
-                    done: true, 
-                    reply: crisisReply, 
-                    riskLevel: 'CRITICAL', 
-                    riskScore: 95, 
-                    riskTier: 'CRITICAL', 
+                res.write(`data: ${JSON.stringify({
+                    done: true,
+                    reply: crisisReply,
+                    riskLevel: 'CRITICAL',
+                    riskScore: 95,
+                    riskTier: 'CRITICAL',
                     isCrisis: true,
                     interventions,
-                    sessionId, 
-                    escalationStatus: updatedStatus 
+                    sessionId,
+                    escalationStatus: updatedStatus
                 })}\n\n`);
                 return res.end();
             }
@@ -332,15 +338,42 @@ router.post('/', verifyToken, async (req, res) => {
             });
         }
 
-        // 3. Process via AI service with assessment data
-        const assessment = await getUserAssessment(userId);
-        const responseData = await handleChat(message, history, assessment);
+        // 3. Process via AI service with assessment data and server-evaluated risk tier
+        const assessment    = await getUserAssessment(userId);
+        const responseData  = await handleChat(
+            message,
+            history,
+            assessment,
+            multiSignalEval.riskLevel,  // pass server risk tier for system prompt calibration
+            abortSignal                 // Fix A/E: propagate abort into the LLM call
+        );
+
+        // If the client disconnected mid-generation, stop here cleanly
+        if (responseData.aborted || res.writableEnded) return;
+
         const cleanedReply = responseData.reply || "I hear you. Tell me more about that.";
 
-        // 4. Save to SQL DB
+        // ── RISK_FLAG handling ───────────────────────────────────────────────────
+        // The LLM may append [[RISK_FLAG: reason]] when it notices subtle risk that
+        // the deterministic regex engine missed. We treat this as a secondary signal:
+        // log it for audit, then re-run the full risk engine with the flag as input.
+        // It NEVER locks chat or shows hotlines on its own.
+        if (responseData.riskFlag) {
+            logAuditEvent('LLM_RISK_FLAG', userId, null, 'SYSTEM', {
+                reason: responseData.riskFlag,
+                message: message.slice(0, 200)   // keep the log bounded
+            });
+
+            // Re-run full multi-signal evaluation with llmRiskFlag as an additional signal
+            evaluateMultiSignalRisk(userId, { llmRiskFlag: responseData.riskFlag })
+                .catch(err => console.warn('[RISK_FLAG] Re-evaluation error (non-blocking):', err.message));
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
+        // 4. Save AI reply to SQL DB
         await new Promise((resolve, reject) => {
-            db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`, 
-            [userId, cleanedReply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId], 
+            db.run(`INSERT INTO Sessions (user_id, sender, content, risk_level, risk_score, session_id) VALUES (?, 'ai', ?, ?, ?, ?)`,
+            [userId, cleanedReply, multiSignalEval.riskLevel, multiSignalEval.riskScore, sessionId],
             function(err) {
                 if (err) reject(err);
                 resolve();
@@ -352,7 +385,7 @@ router.post('/', verifyToken, async (req, res) => {
         const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
 
         // 5. Stream response at ~100 tokens per second (word/token chunks every ~12ms)
-        if (wantsStream) {
+        if (wantsStream && !res.writableEnded) {
             res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
             res.setHeader('Cache-Control', 'no-cache, no-transform');
             res.setHeader('Connection', 'keep-alive');
@@ -360,29 +393,31 @@ router.post('/', verifyToken, async (req, res) => {
 
             const tokenChunks = cleanedReply.split(/(\s+)/);
             for (const chunk of tokenChunks) {
-                if (chunk) {
+                // Fix E: stop writing if client already disconnected
+                if (chunk && !abortSignal.aborted && !res.writableEnded) {
                     res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-                    // Rate limit to ~100 tokens/sec (approx 10-12ms delay per token/word)
                     await new Promise((resolve) => setTimeout(resolve, 12));
                 }
             }
 
-            res.write(`data: ${JSON.stringify({
-                done: true,
-                reply: cleanedReply,
-                riskLevel: multiSignalEval.riskLevel,
-                riskScore: multiSignalEval.riskScore,
-                riskTier: multiSignalEval.riskLevel,
-                interventions: recommendedInterventions,
-                sessionId,
-                escalationStatus: updatedStatus
-            })}\n\n`);
+            if (!res.writableEnded) {
+                res.write(`data: ${JSON.stringify({
+                    done: true,
+                    reply: cleanedReply,
+                    riskLevel: multiSignalEval.riskLevel,
+                    riskScore: multiSignalEval.riskScore,
+                    riskTier: multiSignalEval.riskLevel,
+                    interventions: recommendedInterventions,
+                    sessionId,
+                    escalationStatus: updatedStatus
+                })}\n\n`);
+            }
             return res.end();
         }
 
         // Non-streaming fallback
-        return res.json({ 
-            ...responseData, 
+        return res.json({
+            ...responseData,
             reply: cleanedReply,
             riskLevel: multiSignalEval.riskLevel,
             riskScore: multiSignalEval.riskScore,
@@ -392,12 +427,20 @@ router.post('/', verifyToken, async (req, res) => {
             escalationStatus: updatedStatus
         });
     } catch (error) {
+        if (error.name === 'AbortError' || abortSignal.aborted) {
+            // Client disconnected — end the response cleanly without logging an error
+            if (!res.writableEnded) res.end();
+            return;
+        }
         console.error('Chat routing error:', error);
         if (!res.headersSent) {
             res.status(500).json({ error: 'An error occurred while communicating with the AI Therapist' });
-        } else {
+        } else if (!res.writableEnded) {
             res.end();
         }
+    } finally {
+        // Fix E: always remove the close listener to prevent accumulation across requests
+        req.removeListener('close', onClientClose);
     }
 });
 
