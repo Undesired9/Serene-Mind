@@ -431,7 +431,41 @@ const schemaStatements = [
     `CREATE INDEX IF NOT EXISTS idx_risk_evals_user_id ON Risk_Evaluations(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_appointments_patient ON Appointments(patient_id)`,
     `CREATE INDEX IF NOT EXISTS idx_appointments_doctor ON Appointments(doctor_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON Audit_Logs(user_id)`
+    `CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON Audit_Logs(user_id)`,
+
+    // ── Group 3: Doctor Portal — Patient Assignment ────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS Patient_Doctor_Assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER NOT NULL,
+        doctor_id  INTEGER NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'ACTIVE',
+        assigned_by TEXT DEFAULT 'SYSTEM',
+        UNIQUE(patient_id, doctor_id),
+        FOREIGN KEY (patient_id) REFERENCES Users(id) ON DELETE CASCADE,
+        FOREIGN KEY (doctor_id)  REFERENCES Doctors(id) ON DELETE CASCADE
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS Clinician_Messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_doctor_id   INTEGER NOT NULL,
+        recipient_patient_id INTEGER,
+        recipient_doctor_id  INTEGER,
+        subject TEXT,
+        body TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT 0,
+        read_at DATETIME,
+        priority TEXT DEFAULT 'NORMAL',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sender_doctor_id)    REFERENCES Doctors(id) ON DELETE CASCADE,
+        FOREIGN KEY (recipient_patient_id) REFERENCES Users(id)   ON DELETE CASCADE,
+        FOREIGN KEY (recipient_doctor_id)  REFERENCES Doctors(id)  ON DELETE CASCADE
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_pda_patient  ON Patient_Doctor_Assignments(patient_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_pda_doctor   ON Patient_Doctor_Assignments(doctor_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_cm_recipient ON Clinician_Messages(recipient_patient_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_cm_sender    ON Clinician_Messages(sender_doctor_id)`
 ];
 
 async function seedDefaultDoctors() {
@@ -492,11 +526,46 @@ async function seedDefaultDoctors() {
     }
 }
 
+/**
+ * Safe ALTER TABLE migration — adds columns to existing tables without crashing if they already exist.
+ * SQLite does not support IF NOT EXISTS for ADD COLUMN, so we catch the error and continue.
+ */
+const migrationStatements = [
+    // Patient_Intake: care status for stepped care / discharge tracking
+    { sql: `ALTER TABLE Patient_Intake ADD COLUMN care_status TEXT DEFAULT 'ACTIVE'`,           label: 'Patient_Intake.care_status' },
+    // Risk_Evaluations: clinician manual override fields
+    { sql: `ALTER TABLE Risk_Evaluations ADD COLUMN manual_override_tier TEXT`,                 label: 'Risk_Evaluations.manual_override_tier' },
+    { sql: `ALTER TABLE Risk_Evaluations ADD COLUMN override_reason TEXT`,                      label: 'Risk_Evaluations.override_reason' },
+    { sql: `ALTER TABLE Risk_Evaluations ADD COLUMN overridden_by_doctor_id INTEGER`,           label: 'Risk_Evaluations.overridden_by_doctor_id' },
+    { sql: `ALTER TABLE Risk_Evaluations ADD COLUMN overridden_at DATETIME`,                    label: 'Risk_Evaluations.overridden_at' },
+    // Care_Plans: patient acknowledgment + structured SOAP fields
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN viewed_at DATETIME`,                             label: 'Care_Plans.viewed_at' },
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_subjective TEXT`,                           label: 'Care_Plans.soap_subjective' },
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_objective TEXT`,                            label: 'Care_Plans.soap_objective' },
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_assessment TEXT`,                           label: 'Care_Plans.soap_assessment' },
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_plan TEXT`,                                 label: 'Care_Plans.soap_plan' }
+];
+
+async function runMigrations() {
+    for (const { sql, label } of migrationStatements) {
+        try {
+            await client.execute(sql);
+            console.log(`✅ Migration applied: ${label}`);
+        } catch (err) {
+            // "duplicate column name" is expected on existing databases — skip silently
+            if (!err.message?.includes('duplicate column') && !err.message?.includes('already exists')) {
+                console.warn(`⚠️ Migration skipped (${label}): ${err.message}`);
+            }
+        }
+    }
+}
+
 async function initializeDatabase() {
     try {
         for (const stmt of schemaStatements) {
             await client.execute(stmt);
         }
+        await runMigrations();
         await seedDefaultDoctors();
         console.log('✅ SereneMind SQLite/Turso database schema initialized successfully.');
     } catch (err) {
