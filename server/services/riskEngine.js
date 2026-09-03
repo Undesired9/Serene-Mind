@@ -11,6 +11,41 @@ const HIGH_DISTRESS_KEYWORDS = [
 ];
 
 /**
+ * Computes the linear regression slope of a user's mood scores over the last `days` entries.
+ * A slope < WORSENING_SLOPE_THRESHOLD indicates a consistent downward trend.
+ *
+ * Returns the slope per entry (not per day — entries may not be daily).
+ * A value of -0.15 or less is considered a worsening trend worth surfacing.
+ */
+const WORSENING_SLOPE_THRESHOLD = -0.15;
+
+const computeMoodSlope = async (userId, limit = 14) => {
+    const rows = await new Promise((resolve) => {
+        db.all(
+            `SELECT mood_score FROM Mood_Logs WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?`,
+            [userId, limit],
+            (err, rows) => resolve(rows || [])
+        );
+    });
+
+    if (rows.length < 4) return { slope: 0, worseningTrend: false };
+
+    // Reverse so index 0 = oldest
+    const values = rows.map(r => r.mood_score).reverse();
+    const n = values.length;
+    const sumX  = n * (n - 1) / 2;
+    const sumX2 = n * (n - 1) * (2 * n - 1) / 6;
+    const sumY  = values.reduce((a, v) => a + v, 0);
+    const sumXY = values.reduce((a, v, i) => a + i * v, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    return {
+        slope: Number(slope.toFixed(4)),
+        worseningTrend: slope < WORSENING_SLOPE_THRESHOLD
+    };
+};
+
+/**
  * Multi-Signal Risk Assessment:
  * Synthesizes PHQ-9 (0-27), GAD-7 (0-21), dedicated safety item, conversational cues, and mood trend.
  */
@@ -23,7 +58,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
     // 1. Check conversational / immediate message text if present
     if (incomingSignal.messageText) {
         const text = incomingSignal.messageText.toLowerCase();
-        
+
         const hasCrisis = CRISIS_KEYWORDS.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
         if (hasCrisis) {
             score += 90;
@@ -37,6 +72,15 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
             score += highDistress.length * 15;
             triggeredSignals.push({ type: 'HIGH_DISTRESS_KEYWORDS', signal: `Distress indicators: ${highDistress.join(', ')}` });
         }
+    }
+
+    // 1b. LLM defense-in-depth secondary signal (stripped before display; never locks chat alone)
+    if (incomingSignal.llmRiskFlag) {
+        score += 20;
+        triggeredSignals.push({
+            type:   'LLM_RISK_FLAG',
+            signal: `AI companion detected possible risk: ${incomingSignal.llmRiskFlag}`
+        });
     }
 
     // 2. Query latest assessment scores & safety item from Database
@@ -78,6 +122,16 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
             score += 20;
             triggeredSignals.push({ type: 'LONGITUDINAL_MOOD_DECLINE', signal: `Consistently low mood trajectory (Avg: ${avgMood.toFixed(1)}/10)` });
         }
+    }
+
+    // 4. Worsening trend detection via linear regression over last 14 mood entries
+    const { slope, worseningTrend } = await computeMoodSlope(userId);
+    if (worseningTrend) {
+        score += 15;
+        triggeredSignals.push({
+            type:   'WORSENING_TREND',
+            signal: `Mood declining (slope ${slope}/entry over last 14 logs) — may need proactive outreach`
+        });
     }
 
     // Determine Risk Level
@@ -124,11 +178,13 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
         riskScore: score,
         triggeredSignals,
         actionTaken,
-        isCrisis: hasConversationalCrisis
+        isCrisis: hasConversationalCrisis,
+        worseningTrend: worseningTrend ?? false
     };
 };
 
 module.exports = {
     evaluateMultiSignalRisk,
+    computeMoodSlope,
     CRISIS_KEYWORDS
 };
