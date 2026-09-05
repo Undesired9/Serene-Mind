@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
         borderColor: '#334155'
     },
     saveUrlBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         paddingVertical: 10,
         borderRadius: 10,
         alignItems: 'center'

@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
         marginTop: 12
     },
     confirmBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 8

@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 10,
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         alignItems: 'center'
     },
     shareBtnText: {

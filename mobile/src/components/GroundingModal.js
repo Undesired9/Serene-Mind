@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
         flex: 2,
         paddingVertical: 14,
         borderRadius: 14,
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         alignItems: 'center'
     },
     nextBtnText: {

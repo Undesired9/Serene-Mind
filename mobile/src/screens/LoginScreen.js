@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
         color: '#0D1B2A'
     },
     submitBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         paddingVertical: 14,
         borderRadius: 14,
         alignItems: 'center',
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     },
     saveBtn: {
         flex: 2,
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         paddingVertical: 10,
         borderRadius: 10,
         alignItems: 'center'

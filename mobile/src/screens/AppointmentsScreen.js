@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
         marginBottom: 12
     },
     bookBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 10,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 10,
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         alignItems: 'center'
     },
     confirmBtnText: {

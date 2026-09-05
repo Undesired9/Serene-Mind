@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold'
     },
     nextBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         borderRadius: 14,
         paddingVertical: 14,
         alignItems: 'center',
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
         fontSize: 14
     },
     finishBtn: {
-        backgroundColor: '#0E7C7B',
+        backgroundColor: '#1B98E0',
         borderRadius: 14,
         paddingVertical: 14,
         alignItems: 'center'
