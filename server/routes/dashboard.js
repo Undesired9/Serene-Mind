@@ -74,6 +74,11 @@ router.get('/stats', verifyToken, async (req, res) => {
             WHERE user_id = ? AND sender = 'user'
         `, [userId]);
 
+        // Get real chat session count (not a fabricated estimate)
+        const chatSessions = await getQuery(`
+            SELECT COUNT(*) as count FROM Chat_Sessions WHERE user_id = ?
+        `, [userId]);
+
         // Get mood trend for standard 7-day chart view + aggregate score
         const moodLogs = await allQuery(`
             SELECT date, AVG(mood_score) as avg_mood 
@@ -101,7 +106,7 @@ router.get('/stats', verifyToken, async (req, res) => {
         }
         
         const messageCount = sessionsStats.totalMessages || 0;
-        const totalSessions = Math.ceil(messageCount / 4); 
+        const totalSessions = chatSessions.count || 0; 
 
         res.json({
             totalSessions,

@@ -548,14 +548,18 @@ const migrationStatements = [
 
 async function runMigrations() {
     for (const { sql, label } of migrationStatements) {
+        const [table, column] = label.split('.');
         try {
+            // SQLite lacks ALTER TABLE ... ADD COLUMN IF NOT EXISTS, so check the
+            // live schema first instead of relying on brittle error-message matching.
+            const res = await client.execute(`PRAGMA table_info(${table})`);
+            const alreadyPresent = (res.rows || []).some(r => r.name === column);
+            if (alreadyPresent) continue;
+
             await client.execute(sql);
             console.log(`✅ Migration applied: ${label}`);
         } catch (err) {
-            // "duplicate column name" is expected on existing databases — skip silently
-            if (!err.message?.includes('duplicate column') && !err.message?.includes('already exists')) {
-                console.warn(`⚠️ Migration skipped (${label}): ${err.message}`);
-            }
+            console.warn(`⚠️ Migration failed (${label}): ${err.message}`);
         }
     }
 }

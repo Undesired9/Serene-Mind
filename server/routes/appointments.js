@@ -122,6 +122,26 @@ const handleBooking = async (req, res) => {
             return res.status(404).json({ error: 'Selected clinician does not exist' });
         }
 
+        const formattedDatetime = apptDate.toISOString();
+
+        // Double-booking guard: reject overlapping 1-hour slots for the same doctor
+        const conflict = await new Promise((resolve, reject) => {
+            db.get(
+                `SELECT COUNT(*) as count FROM Appointments
+                 WHERE doctor_id = ? AND status = 'SCHEDULED'
+                   AND datetime(appointment_datetime)
+                       BETWEEN datetime(?, '-59 minutes') AND datetime(?, '+59 minutes')`,
+                [doctorId, formattedDatetime, formattedDatetime],
+                (err, row) => {
+                    if (err) return reject(err);
+                    resolve(row);
+                }
+            );
+        });
+        if (conflict && conflict.count > 0) {
+            return res.status(409).json({ error: 'This time slot is already booked. Please choose another time.' });
+        }
+
         // Get user's escalation status to get risk tier
         const escalationStatus = await new Promise((resolve, reject) => {
             db.get(`SELECT * FROM User_Escalation_Status WHERE user_id = ?`, [userId], (err, row) => {
@@ -130,13 +150,29 @@ const handleBooking = async (req, res) => {
             });
         });
 
-        const formattedDatetime = apptDate.toISOString();
+        // Derive risk tier from the latest clinical evaluation (canonical tiers:
+        // LOW/MODERATE/HIGH/CRITICAL) falling back to a conservative MODERATE.
+        const latestRisk = await new Promise((resolve, reject) => {
+            db.get(
+                `SELECT risk_level FROM Risk_Evaluations WHERE user_id = ? ORDER BY id DESC LIMIT 1`,
+                [userId],
+                (err, row) => {
+                    if (err) return reject(err);
+                    resolve(row);
+                }
+            );
+        });
+        const riskTier = ['LOW', 'MODERATE', 'HIGH', 'CRITICAL'].includes(latestRisk?.risk_level)
+            ? latestRisk.risk_level
+            : (escalationStatus?.current_risk_tier && ['LOW', 'MODERATE', 'HIGH', 'CRITICAL'].includes(escalationStatus.current_risk_tier)
+                ? escalationStatus.current_risk_tier
+                : 'MODERATE');
 
         // Create appointment
         const result = await new Promise((resolve, reject) => {
             db.run(
                 `INSERT INTO Appointments (patient_id, doctor_id, appointment_datetime, risk_tier, notes) VALUES (?, ?, ?, ?, ?)`,
-                [userId, doctorId, formattedDatetime, escalationStatus?.current_risk_tier || 'ELEVATED', notes],
+                [userId, doctorId, formattedDatetime, riskTier, notes],
                 function(err) {
                     if (err) return reject(err);
                     resolve(this);
