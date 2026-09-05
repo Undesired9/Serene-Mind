@@ -9,11 +9,11 @@ This document provides the compliance and verification matrix for the **SereneMi
 ### 🛡️ NFR-1: Data Integrity & Strict Field Validation
 | Area | Validation Rule | Enforcement Layer | Failure Action |
 | :--- | :--- | :--- | :--- |
-| **User Registration** | Username: `^[a-zA-Z0-9_]{3,30}$`<br>Email: RFC 5322 regex<br>Password: Min 8 chars, mixed case, numbers | Frontend + `backend/routes/auth.js` | HTTP 400 with specific error string |
-| **Intake Form** | Legal & Preferred Name: Alphabetic characters<br>Age: $5 \le \text{age} \le 120$<br>Phone: E.164 compliant format | Frontend + `backend/routes/auth.js` | HTTP 400 with field indicator |
+| **User Registration** | Username: `^[a-zA-Z0-9_]{3,30}$`<br>Email: RFC 5322 regex<br>Password: Min 8 chars, mixed case, numbers | Frontend + `server/routes/auth.js` | HTTP 400 with specific error string |
+| **Intake Form** | Legal & Preferred Name: Alphabetic characters<br>Age: $5 \le \text{age} \le 120$<br>Phone: E.164 compliant format | Frontend + `server/routes/auth.js` | HTTP 400 with field indicator |
 | **Assessments** | PHQ-9: $0–27$<br>GAD-7: $0–21$<br>Items: $0–3$ | Mobile/Web UI + Backend | HTTP 400 |
-| **Appointments** | Date: Future date ISO format<br>Doctor ID: Valid integer | `backend/routes/appointments.js` | HTTP 400 |
-| **Check-ins** | Mood Score: Integer $1–10$<br>Notes: Truncated to 500 chars | `backend/routes/dashboard.js` | HTTP 400 |
+| **Appointments** | Date: Future date ISO format<br>Doctor ID: Valid integer | `server/routes/appointments.js` | HTTP 400 |
+| **Check-ins** | Mood Score: Integer $1–10$<br>Notes: Truncated to 500 chars | `server/routes/dashboard.js` | HTTP 400 |
 
 ---
 

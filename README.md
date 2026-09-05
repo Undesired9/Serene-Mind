@@ -41,14 +41,13 @@ Patient ➔ Registration / Login ➔ Consent & Privacy ➔ Structured Intake ➔
 ```
 Serene-Mind/
 ├── api/                      # Vercel serverless function handlers
-│   ├── index.js              # API entry point (imports server/server.js)
-│   └── [...path].js          # Catch-all route handler
+│   └── index.js              # API entry point (imports server/server.js)
 │
 ├── server/                   # Node.js & Express REST API Server
 │   ├── database/             # SQLite/Turso database schemas and migrations
 │   ├── middleware/           # JWT auth and role validation guards
 │   ├── routes/               # API route modules (auth, chat, dashboard, doctor, reports, appointments)
-│   ├── services/             # Google Gemini AI and business logic services
+│   ├── services/             # OpenRouter AI and business logic services
 │   ├── tests/                # NFR validation test suite
 │   └── server.js             # Express app entry point (Port 5000)
 │
@@ -110,6 +109,6 @@ npx expo start
 
 ## 📖 Detailed Documentation
 
-- [Complete Workflow & Architecture Specification](file:///g:/Serene-Mind/docs/WORKFLOW.md)
-- [Database Schema (ERD)](file:///g:/Serene-Mind/docs/ERD.md)
-- [Mobile App Guide](file:///g:/Serene-Mind/mobile/README.md)
+- [Complete Workflow & Architecture Specification](docs/WORKFLOW.md)
+- [Database Schema (ERD)](docs/ERD.md)
+- [Mobile App Guide](mobile/README.md)

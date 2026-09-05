@@ -1,6 +1,6 @@
 # SereneMind ERD
 
-This ERD reflects the SQLite schema currently created in `backend/database/sqlite.js`.
+This ERD reflects the SQLite schema currently created in `server/database/sqlite.js`.
 
 ```mermaid
 erDiagram
@@ -80,7 +80,7 @@ erDiagram
 
 The route code currently expects some fields and tables that are not present in the SQLite schema above:
 
-- `backend/routes/reports.js` uses `doctor_id`, `status`, and a `Doctors` table, but these are not defined in `Patient_Reports` or the schema.
-- `backend/routes/doctor.js` queries `Assessments.severity` and `Assessments.crisis_risk`, but the schema defines `main_concern` and `self_harm_risk` instead.
+- `server/routes/reports.js` uses `doctor_id`, `status`, and a `Doctors` table, but these are not defined in `Patient_Reports` or the schema.
+- `server/routes/doctor.js` queries `Assessments.severity` and `Assessments.crisis_risk`, but the schema defines `main_concern` and `self_harm_risk` instead.
 
 So this ERD matches the implemented database schema, not every assumption currently present in route queries.

@@ -11,8 +11,8 @@ This guide covers deployment procedures, environment configuration, monitoring, 
 PORT=5000
 NODE_ENV=production
 JWT_SECRET=your_super_secret_jwt_key_32_chars_min
-GEMINI_API_KEY=your_gemini_production_key
-CORS_ORIGIN=https://serenemind.app
+serenemind=your_openrouter_production_key
+CORS_ORIGINS=https://serenemind.vercel.app
 ```
 
 ### Frontend (`.env.production` at project root)

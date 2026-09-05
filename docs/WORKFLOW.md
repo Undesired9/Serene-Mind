@@ -98,7 +98,7 @@ Safety / Risk Analyzer (Deterministic Regex & Heuristic Safety Rules)
 Context Builder (User History, Baseline State, Current Interventions)
      │
      ▼
-AI Response Generator (Google Gemini Orchestration Layer)
+AI Response Generator (OpenRouter AI Orchestration Layer)
      │
      ▼
 Response Validator
@@ -251,7 +251,7 @@ Authentication Module    Patient / Data Module      Clinical Module
                        AI Orchestration Layer
                                   │
                                   ▼
-                   Gemini Model Provider / Fallback
+                   OpenRouter Model Provider
                                   │
                                   ▼
                             SQLite Database
