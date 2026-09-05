@@ -3,13 +3,20 @@ const router = express.Router();
 const db = require('../database/sqlite');
 const { verifyToken, requireDoctor } = require('../middleware/auth');
 
-// Helper to get all doctors
+// Helper to get all approved doctors (patients can only book with approved clinicians)
 const getAllDoctors = () => {
     return new Promise((resolve, reject) => {
-        db.all(`SELECT id, full_name, email, specialization FROM Doctors`, [], (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows);
-        });
+        db.all(
+            `SELECT id, full_name, email, specialization, approval_status
+             FROM Doctors
+             WHERE COALESCE(approval_status, 'APPROVED') = 'APPROVED'
+             ORDER BY full_name ASC`,
+            [],
+            (err, rows) => {
+                if (err) return reject(err);
+                resolve(rows);
+            }
+        );
     });
 };
 
@@ -46,10 +53,24 @@ router.get('/doctors', verifyToken, async (req, res) => {
     }
 });
 
-// GET: Get doctor availability slots
+// GET: Get doctor availability slots (only for approved clinicians)
 router.get('/doctors/:doctorId/availability', verifyToken, async (req, res) => {
     const { doctorId } = req.params;
     try {
+        // Only approved clinicians are bookable; PENDING/REJECTED (and legacy NULL)
+        // doctors are not shown as available to patients.
+        const doctor = await new Promise((resolve) => {
+            db.get(
+                `SELECT id FROM Doctors WHERE id = ? AND COALESCE(approval_status, 'APPROVED') = 'APPROVED'`,
+                [doctorId],
+                (err, row) => resolve(row)
+            );
+        });
+
+        if (!doctor) {
+            return res.status(404).json({ error: 'Doctor not found or unavailable' });
+        }
+
         const slots = generateSampleAvailability(doctorId);
         res.json(slots);
     } catch (err) {
@@ -113,9 +134,13 @@ const handleBooking = async (req, res) => {
     const notes = String(rawNotes).trim().slice(0, 500);
 
     try {
-        // Verify doctor exists
+        // Verify doctor exists AND is approved (patients can only book approved clinicians)
         const doctor = await new Promise((resolve) => {
-            db.get(`SELECT id FROM Doctors WHERE id = ?`, [doctorId], (err, row) => resolve(row));
+            db.get(
+                `SELECT id FROM Doctors WHERE id = ? AND COALESCE(approval_status, 'APPROVED') = 'APPROVED'`,
+                [doctorId],
+                (err, row) => resolve(row)
+            );
         });
 
         if (!doctor) {
