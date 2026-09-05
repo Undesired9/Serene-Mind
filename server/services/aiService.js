@@ -22,15 +22,12 @@ const MAX_RETRIES = Math.max(0, Number(process.env.OPENROUTER_MAX_RETRIES || 2))
 const BASE_RETRY_DELAY_MS = Math.max(150, Number(process.env.OPENROUTER_RETRY_DELAY_MS || 400));
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
-let apiKeyAvailable = false;
-
 function checkApiKey() {
     const apiKey = process.env.serenemind;
     if (!apiKey) {
         console.error("❌ OpenRouter API key not found. Set 'serenemind' environment variable.");
         return false;
     }
-    apiKeyAvailable = true;
     return true;
 }
 
@@ -389,7 +386,10 @@ const handleChat = async (message, history = [], assessment = null, riskTier = '
     }
 
     try {
-        const chatHistory  = sanitizeHistoryForOpenRouter(history);
+        // Bounded, trusted history: never trust the client wholesale — cap the number
+        // of prior turns passed to the LLM (defense-in-depth on top of server-side loading)
+        const boundedHistory = (Array.isArray(history) ? history : []).slice(-20);
+        const chatHistory  = sanitizeHistoryForOpenRouter(boundedHistory);
         // Pass the server-evaluated risk tier so the LLM receives calibrated context
         const systemPrompt = buildSystemPrompt(assessment, riskTier);
 
@@ -490,168 +490,9 @@ Write a short clinical summary.
     }
 };
 
-/**
- * Stream OpenRouter completions using server-sent chunks with nvidia/nemotron-3.5-lightning:free.
- * Fix A: reader is explicitly released/cancelled in a finally block to prevent listener leaks.
- * Fix D: AbortController per retry, previous aborted before retry.
- */
-const streamOpenRouter = async (messages, onChunk, options = {}) => {
-    const apiKey = process.env.serenemind;
-    if (!apiKey) {
-        throw new Error("OpenRouter API key ('serenemind') not found in environment variables");
-    }
-
-    const {
-        maxTokens       = 250,
-        temperature     = 0.6,
-        topP            = 0.9,
-        signal: externalSignal = null
-    } = options;
-
-    let lastError;
-    let previousController = null;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        // Fix D: abort previous in-flight request before retrying
-        if (previousController) previousController.abort();
-        const attemptController = new AbortController();
-        previousController = attemptController;
-
-        let externalAbortCleanup = null;
-        if (externalSignal) {
-            if (externalSignal.aborted) { attemptController.abort(); }
-            else {
-                const onExternalAbort = () => attemptController.abort();
-                externalSignal.addEventListener('abort', onExternalAbort, { once: true });
-                externalAbortCleanup = () => externalSignal.removeEventListener('abort', onExternalAbort);
-            }
-        }
-
-        try {
-            const response = await fetch(OPENROUTER_API_URL, {
-                method: 'POST',
-                signal: attemptController.signal,
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://serenemind.vercel.app',
-                    'X-Title': 'SereneMind'
-                },
-                body: JSON.stringify({
-                    model: PRIMARY_MODEL,
-                    messages,
-                    max_tokens: maxTokens,
-                    temperature,
-                    top_p: topP,
-                    stream: true
-                })
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.text().catch(() => 'Unknown error');
-                const error = new Error(`OpenRouter stream error (${PRIMARY_MODEL}): ${response.status} - ${errorBody}`);
-                error.status = response.status;
-
-                if (isRetryableError(response.status) && attempt < MAX_RETRIES) {
-                    const delay = getRetryDelay(attempt);
-                    await sleep(delay);
-                    continue;
-                }
-                throw error;
-            }
-
-            let fullContent = '';
-
-            if (response.body && response.body.getReader) {
-                const reader  = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer    = '';
-
-                // Fix A: always release reader in finally even on abort/error
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-
-                        for (const line of lines) {
-                            const trimmed = line.trim();
-                            if (!trimmed || !trimmed.startsWith('data:')) continue;
-                            const jsonStr = trimmed.replace(/^data:\s*/, '');
-                            if (jsonStr === '[DONE]') continue;
-
-                            try {
-                                const parsed = JSON.parse(jsonStr);
-                                const delta  = parsed?.choices?.[0]?.delta?.content || '';
-                                if (delta) {
-                                    fullContent += delta;
-                                    if (onChunk) onChunk(delta);
-                                }
-                            } catch (parseErr) { /* malformed SSE line — skip */ }
-                        }
-                    }
-                } finally {
-                    // Fix A: unconditionally release the reader so the underlying stream is freed
-                    reader.cancel().catch(() => {});
-                }
-                } else if (response.body && typeof response.body.on === 'function') {
-                    await new Promise((resolve, reject) => {
-                        let buffer = '';
-                        response.body.on('data', (chunk) => {
-                            buffer += chunk.toString();
-                            const lines = buffer.split('\n');
-                            buffer = lines.pop() || '';
-
-                            for (const line of lines) {
-                                const trimmed = line.trim();
-                                if (!trimmed || !trimmed.startsWith('data:')) continue;
-                                const jsonStr = trimmed.replace(/^data:\s*/, '');
-                                if (jsonStr === '[DONE]') continue;
-
-                                try {
-                                    const parsed = JSON.parse(jsonStr);
-                                    const delta = parsed?.choices?.[0]?.delta?.content || '';
-                                    if (delta) {
-                                        fullContent += delta;
-                                        if (onChunk) onChunk(delta);
-                                    }
-                                } catch (parseErr) {}
-                            }
-                        });
-                        response.body.on('end', () => resolve());
-                        response.body.on('error', (err) => reject(err));
-                    });
-                } else {
-                    // Fallback to json text
-                    const data = await response.json();
-                    fullContent = data?.choices?.[0]?.message?.content || '';
-                    if (onChunk && fullContent) onChunk(fullContent);
-                }
-
-                return fullContent;
-            } catch (err) {
-                lastError = err;
-                if (err.status && isRetryableError(err.status) && attempt < MAX_RETRIES) {
-                    const delay = getRetryDelay(attempt);
-                    await sleep(delay);
-                    continue;
-                }
-                if (attempt >= MAX_RETRIES) {
-                    throw err;
-                }
-            }
-        }
-
-        throw lastError;
-    };
-
 module.exports = {
     handleChat,
     callOpenRouter,
-    streamOpenRouter,
     detectRisk,
     getRiskTier,
     getRiskLevelFromTier,

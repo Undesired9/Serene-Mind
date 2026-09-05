@@ -1,6 +1,3 @@
-const db = require('../database/sqlite');
-const { logAuditEvent } = require('./auditLogger');
-
 const INTERVENTION_CATALOG = {
     GROUNDING: {
         type: 'GROUNDING',
@@ -55,32 +52,7 @@ const getRecommendedInterventions = (riskLevel, presentingConcern = '') => {
     return recommended;
 };
 
-const assignIntervention = (userId, interventionType) => {
-    const template = INTERVENTION_CATALOG[interventionType] || INTERVENTION_CATALOG.BOX_BREATHING;
-
-    return new Promise((resolve, reject) => {
-        const sql = `INSERT INTO Interventions (user_id, type, title, description, status) VALUES (?, ?, ?, ?, 'ASSIGNED')`;
-        db.run(sql, [userId, template.type, template.title, template.description], function(err) {
-            if (err) return reject(err);
-            resolve({ id: this.lastID, ...template, status: 'ASSIGNED' });
-        });
-    });
-};
-
-const completeIntervention = (interventionId, userId, rating, feedback) => {
-    return new Promise((resolve, reject) => {
-        const sql = `UPDATE Interventions SET status = 'COMPLETED', patient_rating = ?, patient_feedback = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`;
-        db.run(sql, [rating, feedback, interventionId, userId], function(err) {
-            if (err) return reject(err);
-            logAuditEvent('INTERVENTION_COMPLETED', userId, null, 'PATIENT', { interventionId, rating });
-            resolve({ success: true });
-        });
-    });
-};
-
 module.exports = {
     INTERVENTION_CATALOG,
-    getRecommendedInterventions,
-    assignIntervention,
-    completeIntervention
+    getRecommendedInterventions
 };

@@ -1,13 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    handleChat, 
-    streamOpenRouter, 
-    buildSystemPrompt, 
-    cleanOutput, 
-    sanitizeHistoryForOpenRouter, 
-    checkApiKey 
-} = require('../services/aiService');
+const { handleChat } = require('../services/aiService');
 const { evaluateMultiSignalRisk } = require('../services/riskEngine');
 const { getRecommendedInterventions } = require('../services/interventionEngine');
 const { logAuditEvent } = require('../services/auditLogger');
@@ -254,7 +247,7 @@ async function getUserAssessment(userId) {
 
 // POST: Add new message to a session and get AI response (supports streaming)
 router.post('/', verifyToken, async (req, res) => {
-    let { message, history, sessionId, stream = true } = req.body;
+    let { message, sessionId, stream = true } = req.body;
     const userId = req.user.id;
 
     if (!message) {
@@ -274,6 +267,15 @@ router.post('/', verifyToken, async (req, res) => {
 
         if (!sessionId) {
             sessionId = await getOrCreateTodaySession(userId);
+        } else {
+            // Ownership guard: if the claimed sessionId is not this user's, fall back safely
+            const ownedSession = await new Promise((resolve, reject) => {
+                db.get(`SELECT id FROM Chat_Sessions WHERE id = ? AND user_id = ?`, [sessionId, userId], (err, row) => {
+                    if (err) return reject(err);
+                    resolve(row);
+                });
+            });
+            if (!ownedSession) sessionId = await getOrCreateTodaySession(userId);
         }
 
         // 1. Instantly save the user's message to the SQL DB
@@ -338,11 +340,25 @@ router.post('/', verifyToken, async (req, res) => {
             });
         }
 
-        // 3. Process via AI service with assessment data and server-evaluated risk tier
+        // 3. Process via AI service with assessment data and server-evaluated risk tier.
+        //    History is loaded server-side (bounded) instead of trusting the client payload.
         const assessment    = await getUserAssessment(userId);
+        const historyRows = await new Promise((resolve, reject) => {
+            db.all(
+                `SELECT sender, content FROM Sessions WHERE user_id = ? AND session_id = ? ORDER BY timestamp ASC, id ASC`,
+                [userId, sessionId],
+                (err, rows) => {
+                    if (err) return reject(err);
+                    resolve(rows || []);
+                }
+            );
+        });
+        // Exclude the just-saved user message (last row); cap at the previous 20 turns
+        const trustedHistory = historyRows.slice(-21, -1);
+
         const responseData  = await handleChat(
             message,
-            history,
+            trustedHistory,
             assessment,
             multiSignalEval.riskLevel,  // pass server risk tier for system prompt calibration
             abortSignal                 // Fix A/E: propagate abort into the LLM call
@@ -380,7 +396,17 @@ router.post('/', verifyToken, async (req, res) => {
             });
         });
 
-        await updateUserEscalationStatus(userId, multiSignalEval.riskScore, multiSignalEval.riskLevel, false);
+        // Preserve an existing chat lock: only a CRITICAL evaluation sets one here, and a
+        // benign message must NOT silently unlock a previously-locked account. Unlocks
+        // happen explicitly via /chat/unlock or appointment booking.
+        const currentEscalation = await getOrCreateUserEscalationStatus(userId);
+        const wasChatLocked = !!currentEscalation && currentEscalation.is_chat_locked === 1;
+        await updateUserEscalationStatus(
+            userId,
+            multiSignalEval.riskScore,
+            multiSignalEval.riskLevel,
+            wasChatLocked || multiSignalEval.riskLevel === 'CRITICAL'
+        );
         const updatedStatus = await getOrCreateUserEscalationStatus(userId);
         const recommendedInterventions = getRecommendedInterventions(multiSignalEval.riskLevel, message);
 

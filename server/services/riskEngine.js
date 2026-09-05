@@ -10,6 +10,16 @@ const HIGH_DISTRESS_KEYWORDS = [
     'panic attack', 'terrified', 'paralyzed', 'unbearable', 'severe depression', 'hopeless', 'worthless'
 ];
 
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const keywordPattern = (keyword) => {
+    // Multi-word phrases keep full word-boundary anchors. Single words accept common
+    // affixes (e.g. "suicide" → "suicidal", "die" → "dies"/"dying") to avoid false negatives.
+    const core = escapeRegExp(keyword);
+    return keyword.includes(' ')
+        ? new RegExp(`\\b${core}\\b`, 'i')
+        : new RegExp(`\\b${core}[a-z]*`, 'i');
+};
+
 /**
  * Computes the linear regression slope of a user's mood scores over the last `days` entries.
  * A slope < WORSENING_SLOPE_THRESHOLD indicates a consistent downward trend.
@@ -59,7 +69,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
     if (incomingSignal.messageText) {
         const text = incomingSignal.messageText.toLowerCase();
 
-        const hasCrisis = CRISIS_KEYWORDS.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
+        const hasCrisis = CRISIS_KEYWORDS.some(k => keywordPattern(k).test(text));
         if (hasCrisis) {
             score += 90;
             safetyFlag = true;
@@ -67,7 +77,7 @@ const evaluateMultiSignalRisk = async (userId, incomingSignal = {}) => {
             triggeredSignals.push({ type: 'CONVERSATIONAL_CRISIS_KEYWORD', signal: 'Explicit crisis or self-harm keywords' });
         }
 
-        const highDistress = HIGH_DISTRESS_KEYWORDS.filter(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
+        const highDistress = HIGH_DISTRESS_KEYWORDS.filter(k => keywordPattern(k).test(text));
         if (highDistress.length > 0) {
             score += highDistress.length * 15;
             triggeredSignals.push({ type: 'HIGH_DISTRESS_KEYWORDS', signal: `Distress indicators: ${highDistress.join(', ')}` });
