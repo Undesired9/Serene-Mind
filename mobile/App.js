@@ -36,7 +36,7 @@ function PatientTabs({ onLogout }) {
         name="Dashboard" 
         component={DashboardScreen} 
         options={{
-          title: 'Home',
+          title: 'Dashboard',
           tabBarIcon: ({ color, size }) => <Home color={color} size={size || 22} />
         }}
       />
@@ -44,7 +44,7 @@ function PatientTabs({ onLogout }) {
         name="Chat" 
         component={ChatScreen} 
         options={{
-          title: 'Companion',
+          title: 'Chat',
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size || 22} />
         }}
       />
@@ -52,7 +52,7 @@ function PatientTabs({ onLogout }) {
         name="Appointments" 
         component={AppointmentsScreen} 
         options={{
-          title: 'Booking',
+          title: 'Appointments',
           tabBarIcon: ({ color, size }) => <Calendar color={color} size={size || 22} />
         }}
       />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Modal, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stethoscope, Server, Settings } from 'lucide-react-native';
 import { api, getApiBaseUrl, setApiBaseUrl, checkServerHealth, DEFAULT_API_URLS } from '../services/api';
 
 export default function LoginScreen({ navigation, onLoginSuccess }) {
@@ -176,15 +177,18 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
                         <View style={styles.divider} />
 
                         <TouchableOpacity style={styles.doctorPortalBtn} onPress={() => navigation.navigate('DoctorLogin')}>
-                            <Text style={styles.doctorPortalText}>👨‍⚕️ Clinician & Doctor Portal</Text>
+                            <Stethoscope size={16} color="#0E7C7B" />
+                            <Text style={styles.doctorPortalText}>Clinician & Doctor Portal</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Server Connection Bar */}
                     <TouchableOpacity style={styles.serverBar} onPress={() => setShowServerModal(true)}>
-                        <Text style={styles.serverBarLabel}>📡 Server API: </Text>
+                        <Server size={12} color="#64748B" />
+                        <Text style={styles.serverBarLabel}>Server API: </Text>
                         <Text style={styles.serverBarUrl} numberOfLines={1}>{serverUrl || 'Loading...'}</Text>
-                        <Text style={styles.serverBarEdit}>⚙️ Change</Text>
+                        <Settings size={12} color="#1B98E0" />
+                        <Text style={styles.serverBarEdit}>Change</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -193,7 +197,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
             <Modal visible={showServerModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>⚙️ Backend Server Connection</Text>
+                        <Text style={styles.modalTitle}>Backend Server Connection</Text>
                         <Text style={styles.modalSub}>Select your environment to ensure mobile connectivity:</Text>
 
                         {/* Presets */}
@@ -372,10 +376,13 @@ const styles = StyleSheet.create({
         marginVertical: 20
     },
     doctorPortalBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
         paddingVertical: 12,
         borderRadius: 12,
         backgroundColor: '#C2FFF0',
-        alignItems: 'center'
     },
     doctorPortalText: {
         color: '#0E7C7B',
@@ -386,6 +393,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 6,
         backgroundColor: '#FFFFFF',
         paddingVertical: 8,
         paddingHorizontal: 14,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { Sprout, Wind, MessageSquare, Calendar } from 'lucide-react-native';
 import { api } from '../services/api';
 import GroundingModal from '../components/GroundingModal';
 
@@ -66,7 +67,7 @@ export default function DashboardScreen({ navigation }) {
                 {/* Header Banner */}
                 <View style={styles.welcomeBanner}>
                     <View style={styles.avatarCircle}>
-                        <Text style={styles.avatarText}>🌿</Text>
+                        <Sprout size={26} color="#0E7C7B" />
                     </View>
                     <View>
                         <Text style={styles.welcomeTitle}>Welcome Back</Text>
@@ -104,7 +105,7 @@ export default function DashboardScreen({ navigation }) {
                 {/* Grounding Exercise Card */}
                 <TouchableOpacity style={styles.groundingCard} onPress={() => setGroundingVisible(true)}>
                     <View style={styles.groundingIconContainer}>
-                        <Text style={styles.groundingIcon}>🧘</Text>
+                        <Wind size={24} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.groundingTitle}>Panic & Anxiety Relief</Text>
@@ -129,12 +130,12 @@ export default function DashboardScreen({ navigation }) {
                 <Text style={styles.sectionHeader}>Quick Actions</Text>
                 <View style={styles.quickActionRow}>
                     <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Chat')}>
-                        <Text style={styles.quickActionEmoji}>💬</Text>
+                        <MessageSquare size={26} color="#1B98E0" style={styles.quickActionIcon} />
                         <Text style={styles.quickActionTitle}>Talk to Companion</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Appointments')}>
-                        <Text style={styles.quickActionEmoji}>📅</Text>
+                        <Calendar size={26} color="#1B98E0" style={styles.quickActionIcon} />
                         <Text style={styles.quickActionTitle}>Book Doctor</Text>
                     </TouchableOpacity>
                 </View>
@@ -330,13 +331,12 @@ const styles = StyleSheet.create({
         borderColor: '#0E7C7B',
         borderStyle: 'dashed'
     },
-    quickActionEmoji: {
-        fontSize: 28,
+    quickActionIcon: {
         marginBottom: 8
     },
     quickActionTitle: {
         fontSize: 13,
         fontWeight: 'bold',
-        color: '#0E7C7B'
+        color: '#1B98E0'
     }
 });
