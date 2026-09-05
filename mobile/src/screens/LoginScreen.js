@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Modal, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, getApiBaseUrl, setApiBaseUrl, checkServerHealth, DEFAULT_API_URLS } from '../services/api';
 
@@ -102,9 +102,11 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
-                        <View style={styles.logoCircle}>
-                            <Text style={styles.logoText}>SM</Text>
-                        </View>
+                        <Image
+                            source={require('../../assets/logo.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
                         <Text style={styles.title}>SereneMind</Text>
                         <Text style={styles.subtitle}>Your AI-Powered Mental Wellness Companion</Text>
                     </View>
@@ -292,19 +294,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24
     },
-    logoCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#0E7C7B',
-        alignItems: 'center',
-        justifyContent: 'center',
+    logo: {
+        width: 112,
+        height: 80,
         marginBottom: 12
-    },
-    logoText: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-        fontSize: 24
     },
     title: {
         fontSize: 28,

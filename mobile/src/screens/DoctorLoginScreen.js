@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 
@@ -32,9 +32,11 @@ export default function DoctorLoginScreen({ navigation, onLoginSuccess }) {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
-                        <View style={styles.logoCircle}>
-                            <Text style={styles.logoText}>🩺</Text>
-                        </View>
+                        <Image
+                            source={require('../../assets/logo.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
                         <Text style={styles.title}>Doctor Portal</Text>
                         <Text style={styles.subtitle}>SereneMind Clinical Triage & Risk Monitoring</Text>
                     </View>
@@ -94,17 +96,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 28
     },
-    logoCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#3D5A80',
-        alignItems: 'center',
-        justifyContent: 'center',
+    logo: {
+        width: 112,
+        height: 80,
         marginBottom: 12
-    },
-    logoText: {
-        fontSize: 30
     },
     title: {
         fontSize: 26,
