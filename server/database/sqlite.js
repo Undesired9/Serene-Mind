@@ -201,6 +201,15 @@ const schemaStatements = [
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
 
+    `CREATE TABLE IF NOT EXISTS Admins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        full_name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
     `CREATE TABLE IF NOT EXISTS Chat_Sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -514,8 +523,8 @@ async function seedDefaultDoctors() {
 
             for (const doc of doctors) {
                 await client.execute({
-                    sql: `INSERT OR IGNORE INTO Doctors (username, full_name, email, password_hash, specialization, license_number) 
-                          VALUES (?, ?, ?, ?, ?, ?)`,
+                    sql: `INSERT OR IGNORE INTO Doctors (username, full_name, email, password_hash, specialization, license_number, approval_status) 
+                          VALUES (?, ?, ?, ?, ?, ?, 'APPROVED')`,
                     args: [doc.username, doc.full_name, doc.email, doc.password_hash, doc.specialization, doc.license_number]
                 });
             }
@@ -523,6 +532,48 @@ async function seedDefaultDoctors() {
         }
     } catch (err) {
         console.warn('⚠️ Clinician seeding note:', err.message);
+    }
+}
+
+async function seedDefaultAdmin() {
+    try {
+        const countRes = await client.execute("SELECT COUNT(*) as count FROM Admins");
+        const count = countRes.rows && countRes.rows.length > 0 ? Number(countRes.rows[0].count || 0) : 0;
+
+        // Only seed if the Admins table is empty (guard preserved in both modes).
+        if (count === 0) {
+            const isProduction = process.env.NODE_ENV === 'production';
+            const adminPassword = (process.env.ADMIN_PASSWORD || '').trim();
+
+            // Production safety: NEVER fall back to the known default password. Seeding is
+            // only allowed when an explicit (strong) ADMIN_PASSWORD is provided; otherwise
+            // this is a misconfiguration and the admin account is simply not created.
+            if (isProduction) {
+                if (!adminPassword) {
+                    console.error('⚠️ ADMIN SEED SKIPPED: NODE_ENV=production but ADMIN_PASSWORD is not set. Set ADMIN_PASSWORD (and optionally ADMIN_USERNAME/ADMIN_EMAIL) in the environment to create the initial admin.');
+                    return;
+                }
+                if (adminPassword.length < 8) {
+                    console.error('⚠️ ADMIN SEED SKIPPED: NODE_ENV=production but ADMIN_PASSWORD is shorter than 8 characters. Set a strong ADMIN_PASSWORD (at least 8 characters) in the environment to create the initial admin.');
+                    return;
+                }
+            }
+
+            console.log('🌱 Seeding default platform administrator...');
+            const adminUsername = (process.env.ADMIN_USERNAME || 'admin').trim();
+            const adminFullName = (process.env.ADMIN_FULL_NAME || 'Platform Administrator').trim();
+            const adminEmail = (process.env.ADMIN_EMAIL || 'admin@serenemind.app').trim();
+            // Dev/demo: documented default password 'Admin@12345' unless overridden.
+            const passwordHash = bcrypt.hashSync(isProduction ? adminPassword : (adminPassword || 'Admin@12345'), 10);
+
+            await client.execute({
+                sql: `INSERT INTO Admins (username, full_name, email, password_hash) VALUES (?, ?, ?, ?)`,
+                args: [adminUsername, adminFullName, adminEmail, passwordHash]
+            });
+            console.log('✅ Default platform administrator seeded successfully.');
+        }
+    } catch (err) {
+        console.warn('⚠️ Admin seeding note:', err.message);
     }
 }
 
@@ -543,7 +594,13 @@ const migrationStatements = [
     { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_subjective TEXT`,                           label: 'Care_Plans.soap_subjective' },
     { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_objective TEXT`,                            label: 'Care_Plans.soap_objective' },
     { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_assessment TEXT`,                           label: 'Care_Plans.soap_assessment' },
-    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_plan TEXT`,                                 label: 'Care_Plans.soap_plan' }
+    { sql: `ALTER TABLE Care_Plans ADD COLUMN soap_plan TEXT`,                                 label: 'Care_Plans.soap_plan' },
+    // Doctors: clinician approval workflow (admin panel). New registrations start PENDING;
+    // existing/seeded rows are grandfathered APPROVED via the column default.
+    { sql: `ALTER TABLE Doctors ADD COLUMN approval_status TEXT DEFAULT 'APPROVED'`,           label: 'Doctors.approval_status' },
+    { sql: `ALTER TABLE Doctors ADD COLUMN rejection_reason TEXT`,                             label: 'Doctors.rejection_reason' },
+    { sql: `ALTER TABLE Doctors ADD COLUMN reviewed_at DATETIME`,                              label: 'Doctors.reviewed_at' },
+    { sql: `ALTER TABLE Doctors ADD COLUMN reviewed_by INTEGER`,                               label: 'Doctors.reviewed_by' }
 ];
 
 async function runMigrations() {
@@ -571,6 +628,7 @@ async function initializeDatabase() {
         }
         await runMigrations();
         await seedDefaultDoctors();
+        await seedDefaultAdmin();
         console.log('✅ SereneMind SQLite/Turso database schema initialized successfully.');
     } catch (err) {
         console.error('⚠️ Database schema initialization notice:', err.message);

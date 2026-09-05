@@ -13,6 +13,7 @@ const doctorRoutes = require('./routes/doctor');
 const reportsRoutes = require('./routes/reports');
 const appointmentsRoutes = require('./routes/appointments');
 const healthRoutes = require('./routes/health');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,6 +39,12 @@ app.use(express.json());
 // Bulletproof URL Normalization for Vercel Serverless & Local
 app.use((req, res, next) => {
     let rawPath = req.url || '/';
+
+    // Preserve the query string from the ORIGINAL req.url so filters like
+    // ?status=PENDING survive URL normalization (previously stripped on every
+    // request, making req.query unreachable over real HTTP).
+    const queryIdx = (req.url || '/').indexOf('?');
+    const preservedQuery = queryIdx >= 0 ? (req.url || '/').slice(queryIdx) : '';
 
     // 1. Extract from Vercel headers if available
     const vercelPath = req.headers['x-matched-path'] || req.headers['x-now-route-matches'];
@@ -72,7 +79,7 @@ app.use((req, res, next) => {
         rawPath = '/' + rawPath;
     }
 
-    req.url = rawPath;
+    req.url = rawPath + preservedQuery;
     next();
 });
 
@@ -94,6 +101,7 @@ app.use('/doctor', doctorRoutes);
 app.use('/reports', reportsRoutes);
 app.use('/appointments', appointmentsRoutes);
 app.use('/health', healthRoutes);
+app.use('/admin', adminRoutes);
 
 // Fallback: Also mount with /api in case middleware was bypassed
 app.use('/api/auth', authRoutes);
@@ -103,6 +111,7 @@ app.use('/api/doctor', doctorRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

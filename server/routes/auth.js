@@ -270,6 +270,117 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Login Admin (platform administrator)
+// ── Admin login brute-force protection ────────────────────────────────────────
+// Simple per-process, in-memory sliding-window limiter for POST /admin/login ONLY
+// (patient/doctor logins are out of scope). Keyed by req.ip -> array of failure
+// timestamps. NOTE: this is per-process memory — fine for this app, but multi-instance
+// deployments would need a shared store (e.g. Redis) to enforce the limit globally.
+const adminLoginAttempts = new Map();
+const ADMIN_LOGIN_MAX_ATTEMPTS = 10;
+const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+// Prune expired timestamps (>15 min) for an IP; also keeps the Map bounded by
+// sweeping empty entries and evicting oldest entries past a 10k-entry cap.
+const pruneAdminLoginAttempts = (ip) => {
+    const cutoff = Date.now() - ADMIN_LOGIN_WINDOW_MS;
+    const timestamps = (adminLoginAttempts.get(ip) || []).filter(t => t > cutoff);
+
+    if (timestamps.length === 0) {
+        adminLoginAttempts.delete(ip);
+    } else {
+        adminLoginAttempts.set(ip, timestamps);
+    }
+
+    if (adminLoginAttempts.size > 10000) {
+        for (const [key, arr] of adminLoginAttempts) {
+            if (arr.length === 0) adminLoginAttempts.delete(key);
+        }
+        while (adminLoginAttempts.size > 10000) {
+            adminLoginAttempts.delete(adminLoginAttempts.keys().next().value);
+        }
+    }
+};
+
+const recordAdminLoginFailure = (ip) => {
+    pruneAdminLoginAttempts(ip);
+    const timestamps = adminLoginAttempts.get(ip) || [];
+    timestamps.push(Date.now());
+    adminLoginAttempts.set(ip, timestamps);
+};
+
+// Returns true when the caller should be 429'd BEFORE revealing whether the
+// supplied credentials were valid (more than ADMIN_LOGIN_MAX_ATTEMPTS failures
+// recorded in the sliding window).
+const isAdminLoginRateLimited = (ip) => {
+    pruneAdminLoginAttempts(ip);
+    return (adminLoginAttempts.get(ip) || []).length > ADMIN_LOGIN_MAX_ATTEMPTS;
+};
+
+router.post('/admin/login', async (req, res) => {
+    const identifier = normalizeIdentifier(req.body.identifier || req.body.email || req.body.username);
+    const password = req.body.password || '';
+    const validationError = validateLoginPayload({ identifier, password });
+
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+
+    try {
+        const admin = await getRow(
+            `SELECT * FROM Admins WHERE lower(username) = lower(?) OR lower(email) = lower(?)`,
+            [identifier, identifier]
+        );
+
+        if (!admin) {
+            recordAdminLoginFailure(ip);
+            if (isAdminLoginRateLimited(ip)) {
+                return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+            }
+            logAuditEvent('ADMIN_LOGIN_FAILED', null, null, 'admin', { ip, reason: 'invalid credentials' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, admin.password_hash);
+        if (!isValidPassword) {
+            recordAdminLoginFailure(ip);
+            if (isAdminLoginRateLimited(ip)) {
+                return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+            }
+            logAuditEvent('ADMIN_LOGIN_FAILED', null, null, 'admin', { ip, reason: 'invalid credentials' });
+            return res.status(401).json({ error: 'Invalid username/email or password' });
+        }
+
+        // Success: clear this IP's failure counter
+        adminLoginAttempts.delete(ip);
+
+        const token = jwt.sign(
+            { id: admin.id, username: admin.username, fullName: admin.full_name, role: 'admin' },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        logAuditEvent('ADMIN_LOGIN', admin.id, admin.id, 'admin', { action: 'Admin logged in' });
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: admin.id,
+                username: admin.username,
+                fullName: admin.full_name,
+                email: admin.email,
+                role: 'admin'
+            }
+        });
+    } catch (err) {
+        console.error('Admin login error:', err);
+        return res.status(500).json({ error: 'Database query error' });
+    }
+});
+
 router.get('/intake', verifyToken, async (req, res) => {
     try {
         const intake = await getRow(`SELECT * FROM Patient_Intake WHERE user_id = ?`, [req.user.id]);
@@ -474,8 +585,8 @@ router.post('/doctor/register', async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 10);
 
-        const fields = ['username', 'full_name', 'email', 'password_hash', 'specialization', 'license_number'];
-        const values = [username, fullName, email, passwordHash, specialization || '', licenseNumber || ''];
+        const fields = ['username', 'full_name', 'email', 'password_hash', 'specialization', 'license_number', 'approval_status'];
+        const values = [username, fullName, email, passwordHash, specialization || '', licenseNumber || '', 'PENDING'];
 
         const placeholders = fields.map(() => '?').join(', ');
         const result = await runStatement(
@@ -483,26 +594,18 @@ router.post('/doctor/register', async (req, res) => {
             values
         );
 
-        const token = jwt.sign(
-            { id: result.lastID, username, fullName, email, role: 'doctor' },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        logAuditEvent('DOCTOR_REGISTERED', result.lastID, result.lastID, 'CLINICIAN', { action: 'Doctor registered' });
+        logAuditEvent('DOCTOR_REGISTERED', result.lastID, result.lastID, 'doctor', { action: 'Doctor registration submitted for admin approval' });
 
         res.status(201).json({
-            message: 'Doctor account created successfully',
-            token,
-            user: {
+            message: 'Doctor registration submitted for admin approval.',
+            doctor: {
                 id: result.lastID,
                 username,
                 fullName,
                 email,
                 specialization: specialization || '',
                 licenseNumber: licenseNumber || '',
-                role: 'doctor',
-                needsAssessment: false
+                approvalStatus: 'PENDING'
             }
         });
     } catch (err) {
@@ -544,6 +647,22 @@ router.post('/doctor/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
+        // Approval gate: new registrations start PENDING; treat legacy NULL as APPROVED.
+        const approvalStatus = doctor.approval_status || 'APPROVED';
+
+        if (approvalStatus === 'PENDING') {
+            return res.status(403).json({
+                error: 'Your doctor account is pending admin approval. You will be able to log in once approved.'
+            });
+        }
+
+        if (approvalStatus === 'REJECTED') {
+            return res.status(403).json({
+                error: 'Your doctor account was rejected.',
+                rejectionReason: doctor.rejection_reason || ''
+            });
+        }
+
         const token = jwt.sign(
             { id: doctor.id, username: doctor.username || '', fullName: doctor.full_name, email: doctor.email, role: 'doctor' },
             JWT_SECRET,
@@ -563,7 +682,8 @@ router.post('/doctor/login', async (req, res) => {
                 specialization: doctor.specialization || '',
                 licenseNumber: doctor.license_number || '',
                 role: 'doctor',
-                needsAssessment: false
+                needsAssessment: false,
+                approvalStatus
             }
         });
     } catch (err) {
