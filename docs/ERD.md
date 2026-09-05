@@ -66,6 +66,15 @@ erDiagram
     Users ||--o{ Mood_Logs : records
     Users ||--o| Assessments : completes
     Users ||--o{ Patient_Reports : has
+
+    Admins {
+        INTEGER id PK
+        TEXT username UK
+        TEXT full_name
+        TEXT email UK
+        TEXT password_hash
+        DATETIME created_at
+    }
 ```
 
 ## Relationship summary
@@ -75,6 +84,15 @@ erDiagram
 - One user can have many mood logs.
 - One user can have zero or one assessment because `Assessments.user_id` is unique.
 - One user can have many patient reports through `Patient_Reports.patient_id`.
+
+## Doctors approval columns
+
+The `Doctors` table carries the clinician approval workflow columns managed by the admin panel:
+
+- `approval_status` — `PENDING` | `APPROVED` | `REJECTED` (default `APPROVED`, so pre-existing/seeded clinicians are grandfathered in; new registrations are inserted as `PENDING`).
+- `rejection_reason` — stored rejection reason when a doctor is rejected.
+- `reviewed_at` — timestamp of the admin review decision.
+- `reviewed_by` — `Admins.id` of the admin who made the decision.
 
 ## Important implementation note
 

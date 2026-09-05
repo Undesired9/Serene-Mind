@@ -105,6 +105,23 @@ npx expo start
 ```
 *Scan the QR code with **Expo Go** or press `a` for Android Emulator / `i` for iOS Simulator.*
 
+### 5. Admin Access
+
+The backend seeds a default platform administrator on first boot (only when the `Admins` table is empty):
+
+| Field     | Value                    |
+|-----------|--------------------------|
+| Username  | `admin`                  |
+| Password  | `Admin@12345`            |
+| Full name | `Platform Administrator` |
+| Email     | `admin@serenemind.app`   |
+
+Override these via the `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`, and `ADMIN_FULL_NAME` environment variables.
+
+> ⚠️ **Production deployments MUST set `ADMIN_PASSWORD`.** When `NODE_ENV=production`, the known default password is never used: seeding is only allowed if `ADMIN_PASSWORD` is explicitly set to a strong value (at least 8 characters). If it is missing or too weak, the admin account is **not** seeded and the server logs a loud warning. The `Admin@12345` default (and any env overrides) applies to local development only.
+
+New doctor registrations require admin approval before the doctor can log in. Admins sign in at `POST /api/auth/admin/login` and manage doctors via the `/api/admin` endpoints (review, approve, or reject pending registrations).
+
 ---
 
 ## 📖 Detailed Documentation
