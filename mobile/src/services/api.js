@@ -81,7 +81,7 @@ export const api = {
     // Auth
     login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
     register: (userData) => request('/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
-    doctorLogin: (credentials) => request('/auth/doctor-login', { method: 'POST', body: JSON.stringify(credentials) }),
+    doctorLogin: (credentials) => request('/auth/doctor/login', { method: 'POST', body: JSON.stringify(credentials) }),
     
     // Intake & Assessment
     submitIntake: (data) => request('/auth/intake', { method: 'POST', body: JSON.stringify(data) }),
