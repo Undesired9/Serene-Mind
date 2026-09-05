@@ -17,8 +17,18 @@ const healthRoutes = require('./routes/health');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// CORS: wildcard origin + credentials is invalid in browsers. Allow a configurable
+// origin allow-list (CORS_ORIGINS env, comma-separated) with local dev defaults.
+const allowedOrigins = (process.env.CORS_ORIGINS
+    || 'http://localhost:5173,http://localhost:3000,http://localhost:5000,http://localhost:8081,http://10.0.2.2:5000,http://172.28.250.3:5000')
+    .split(',').map(s => s.trim()).filter(Boolean);
+
 app.use(cors({
-    origin: '*',
+    origin(origin, callback) {
+        // Requests without an Origin header (curl, native mobile, same-origin) are allowed
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true
@@ -49,9 +59,7 @@ app.use((req, res, next) => {
 
     // Clean up Vercel function names from path
     rawPath = rawPath.replace('/api/index.js', '')
-                     .replace('/api/[...path]', '')
-                     .replace('/index.js', '')
-                     .replace('/[...path]', '');
+                     .replace('/index.js', '');
 
     // Strip /api prefix so all routes match /auth, /chat, etc.
     if (rawPath.startsWith('/api/')) {
@@ -107,10 +115,13 @@ app.use((req, res) => {
     });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
+// Global error handler — never leak internal error details to clients in production
+app.use((err, req, res, _next) => {
     console.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
+    const isDev = process.env.NODE_ENV !== 'production';
+    res.status(500).json(isDev
+        ? { error: 'Internal server error', details: err.message }
+        : { error: 'Internal server error' });
 });
 
 if (process.env.VERCEL !== '1' && require.main === module) {

@@ -204,8 +204,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Username or email already exists' });
         }
 
-        const salt = bcrypt.genSaltSync(10);
-        const passwordHash = bcrypt.hashSync(password, salt);
+        const passwordHash = await bcrypt.hash(password, 10);
         const result = await runStatement(
             `INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)`,
             [username, email, passwordHash]
@@ -245,7 +244,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
-        const isValidPassword = bcrypt.compareSync(password, user.password_hash);
+        const isValidPassword = await bcrypt.compare(password, user.password_hash);
         if (!isValidPassword) {
             return res.status(401).json({ error: 'Invalid username/email or password' });
         }
@@ -266,7 +265,7 @@ router.post('/login', async (req, res) => {
                 needsAssessment: !assessment
             }
         });
-    } catch (err) {
+    } catch {
         return res.status(500).json({ error: 'Database query error' });
     }
 });
@@ -473,8 +472,7 @@ router.post('/doctor/register', async (req, res) => {
             return res.status(400).json({ error: 'Doctor username or email already exists' });
         }
 
-        const salt = bcrypt.genSaltSync(10);
-        const passwordHash = bcrypt.hashSync(password, salt);
+        const passwordHash = await bcrypt.hash(password, 10);
 
         const fields = ['username', 'full_name', 'email', 'password_hash', 'specialization', 'license_number'];
         const values = [username, fullName, email, passwordHash, specialization || '', licenseNumber || ''];
@@ -541,7 +539,7 @@ router.post('/doctor/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid username/email or password' });
         }
 
-        const isValidPassword = bcrypt.compareSync(password, doctor.password_hash);
+        const isValidPassword = await bcrypt.compare(password, doctor.password_hash);
         if (!isValidPassword) {
             return res.status(401).json({ error: 'Invalid username/email or password' });
         }

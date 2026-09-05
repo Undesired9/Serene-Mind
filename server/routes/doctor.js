@@ -12,6 +12,7 @@ const getSeverity = (score = 0) => {
 };
 
 // Shared SQL block to select a patient summary with latest risk evaluation
+// params are passed separately to avoid SQL injection from interpolated values
 const PATIENT_SUMMARY_SQL = (whereClause) => `
     SELECT
         u.id, u.username, u.email, u.created_at,
@@ -40,6 +41,15 @@ const buildPatientObj = (row) => {
         || row.risk_level
         || (isSelfHarm ? 'CRITICAL' : (phq >= 15 || gad >= 15 ? 'HIGH' : (phq >= 10 || gad >= 10 ? 'MODERATE' : 'LOW')));
 
+    let signals = [];
+    if (row.triggered_signals) {
+        try {
+            signals = JSON.parse(row.triggered_signals);
+        } catch {
+            signals = [];
+        }
+    }
+
     return {
         ...row,
         full_name:    row.full_legal_name || row.username,
@@ -48,7 +58,7 @@ const buildPatientObj = (row) => {
         severity:     row.total_score != null ? getSeverity(row.total_score) : null,
         crisis_risk:  isSelfHarm || effectiveTier === 'CRITICAL',
         avg_mood:     row.avg_mood ? Math.round(row.avg_mood * 10) / 10 : null,
-        signals:      row.triggered_signals ? JSON.parse(row.triggered_signals) : [],
+        signals,
         care_status:  row.care_status || 'ACTIVE'
     };
 };
@@ -67,7 +77,7 @@ router.get('/patients', verifyToken, requireDoctor, async (req, res) => {
         // ─ 1. Assigned caseload (privacy-scoped) ─────────────────────────────────────
         const assignedSql = PATIENT_SUMMARY_SQL(`
             INNER JOIN Patient_Doctor_Assignments pda
-                ON u.id = pda.patient_id AND pda.doctor_id = ${doctorId} AND pda.status = 'ACTIVE'
+                ON u.id = pda.patient_id AND pda.doctor_id = ? AND pda.status = 'ACTIVE'
             ORDER BY
                 CASE
                     WHEN re.risk_level = 'CRITICAL' THEN 1
@@ -79,7 +89,7 @@ router.get('/patients', verifyToken, requireDoctor, async (req, res) => {
                 a.total_score DESC, u.created_at DESC
         `);
 
-        const assignedRows = await db.queryAll(assignedSql, []);
+        const assignedRows = await db.queryAll(assignedSql, [doctorId]);
         const assigned = assignedRows.map(buildPatientObj);
 
         // Categorize into clinical queues
@@ -121,62 +131,54 @@ router.get('/patients', verifyToken, requireDoctor, async (req, res) => {
 });
 
 // GET /api/doctor/patients/:id - Detailed patient profile (only own assigned patients)
-router.get('/patients/:id', verifyToken, requireDoctor, (req, res) => {
+router.get('/patients/:id', verifyToken, requireDoctor, async (req, res) => {
     const patientId = req.params.id;
     const clinicianId = req.user.id;
 
-    // Log audit event for compliance
-    logAuditEvent('CLINICIAN_VIEWED_PATIENT', patientId, clinicianId, 'CLINICIAN', { patientId });
+    try {
+        // IDOR guard: only the assigned clinician may view this patient's PHI
+        const assignment = await db.queryGet(
+            `SELECT id FROM Patient_Doctor_Assignments WHERE patient_id = ? AND doctor_id = ? AND status = 'ACTIVE'`,
+            [patientId, clinicianId]
+        );
+        if (!assignment) {
+            return res.status(404).json({ error: 'Patient not found or not in your caseload' });
+        }
 
-    db.get(`SELECT id, username, email, created_at FROM Users WHERE id = ?`, [patientId], (err, user) => {
-        if (err) return res.status(500).json({ error: 'Database error fetching user' });
+        // Log audit event for compliance
+        logAuditEvent('CLINICIAN_VIEWED_PATIENT', patientId, clinicianId, 'CLINICIAN', { patientId });
+
+        const user = await db.queryGet(`SELECT id, username, email, created_at FROM Users WHERE id = ?`, [patientId]);
         if (!user) return res.status(404).json({ error: 'Patient not found' });
 
-        db.get(`SELECT * FROM Assessments WHERE user_id = ?`, [patientId], (err, assessment) => {
-            if (err) return res.status(500).json({ error: 'Database error fetching assessment' });
+        const assessment = await db.queryGet(`SELECT * FROM Assessments WHERE user_id = ?`, [patientId]);
+        const intake = await db.queryGet(`SELECT * FROM Patient_Intake WHERE user_id = ?`, [patientId]);
+        const mood_logs = await db.queryAll(`SELECT id, mood_score, notes, date FROM Mood_Logs WHERE user_id = ? ORDER BY date DESC LIMIT 30`, [patientId]);
+        const riskEvaluations = await db.queryAll(`SELECT * FROM Risk_Evaluations WHERE user_id = ? ORDER BY created_at DESC LIMIT 10`, [patientId]);
+        const carePlans = await db.queryAll(`SELECT * FROM Care_Plans WHERE patient_id = ? ORDER BY updated_at DESC`, [patientId]);
+        const appointments = await db.queryAll(`SELECT * FROM Appointments WHERE patient_id = ? ORDER BY appointment_datetime DESC`, [patientId]);
+        const sessions = await db.queryAll(`SELECT id, sender, content, risk_level, risk_score, timestamp, session_id FROM Sessions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`, [patientId]);
 
-            db.get(`SELECT * FROM Patient_Intake WHERE user_id = ?`, [patientId], (err, intake) => {
-                if (err) return res.status(500).json({ error: 'Database error fetching intake' });
-
-                db.all(`SELECT id, mood_score, notes, date FROM Mood_Logs WHERE user_id = ? ORDER BY date DESC LIMIT 30`, [patientId], (err, mood_logs) => {
-                    if (err) return res.status(500).json({ error: 'Database error fetching mood logs' });
-
-                    db.all(`SELECT * FROM Risk_Evaluations WHERE user_id = ? ORDER BY created_at DESC LIMIT 10`, [patientId], (err, riskEvaluations) => {
-                        if (err) return res.status(500).json({ error: 'Database error fetching risk evaluations' });
-
-                        db.all(`SELECT * FROM Care_Plans WHERE patient_id = ? ORDER BY updated_at DESC`, [patientId], (err, carePlans) => {
-                            if (err) return res.status(500).json({ error: 'Database error fetching care plans' });
-
-                            db.all(`SELECT * FROM Appointments WHERE patient_id = ? ORDER BY appointment_datetime DESC`, [patientId], (err, appointments) => {
-                                if (err) return res.status(500).json({ error: 'Database error fetching appointments' });
-
-                                db.all(`SELECT id, sender, content, risk_level, risk_score, timestamp, session_id FROM Sessions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50`, [patientId], (err, sessions) => {
-                                    if (err) return res.status(500).json({ error: 'Database error fetching sessions' });
-
-                                    res.json({
-                                        user,
-                                        intake: intake || null,
-                                        assessment: assessment ? {
-                                            ...assessment,
-                                            phq9_score: assessment.depression_score,
-                                            gad7_score: assessment.anxiety_score,
-                                            severity: getSeverity(assessment.total_score),
-                                            crisis_risk: !!assessment.self_harm_risk
-                                        } : null,
-                                        mood_logs: mood_logs || [],
-                                        risk_evaluations: riskEvaluations || [],
-                                        care_plans: carePlans || [],
-                                        appointments: appointments || [],
-                                        sessions: sessions || []
-                                    });
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+        res.json({
+            user,
+            intake: intake || null,
+            assessment: assessment ? {
+                ...assessment,
+                phq9_score: assessment.depression_score,
+                gad7_score: assessment.anxiety_score,
+                severity: getSeverity(assessment.total_score),
+                crisis_risk: !!assessment.self_harm_risk
+            } : null,
+            mood_logs: mood_logs || [],
+            risk_evaluations: riskEvaluations || [],
+            care_plans: carePlans || [],
+            appointments: appointments || [],
+            sessions: sessions || []
         });
-    });
+    } catch (err) {
+        console.error('Error fetching patient profile:', err);
+        return res.status(500).json({ error: 'Database error fetching patient profile' });
+    }
 });
 
 /**
@@ -228,6 +230,20 @@ router.post('/risk-override/:evalId', verifyToken, requireDoctor, async (req, re
     }
 
     try {
+        const evalRow = await db.queryGet(
+            `SELECT re.user_id FROM Risk_Evaluations re WHERE re.id = ?`,
+            [evalId]
+        );
+        if (!evalRow) return res.status(404).json({ error: 'Risk evaluation not found' });
+
+        const assignment = await db.queryGet(
+            `SELECT id FROM Patient_Doctor_Assignments WHERE patient_id = ? AND doctor_id = ? AND status = 'ACTIVE'`,
+            [evalRow.user_id, doctorId]
+        );
+        if (!assignment) {
+            return res.status(404).json({ error: 'Risk evaluation not found or patient not in your caseload' });
+        }
+
         const result = await db.queryRun(
             `UPDATE Risk_Evaluations
              SET manual_override_tier = ?, override_reason = ?,
@@ -263,6 +279,14 @@ router.put('/patients/:id/care-status', verifyToken, requireDoctor, async (req, 
     }
 
     try {
+        const assignment = await db.queryGet(
+            `SELECT id FROM Patient_Doctor_Assignments WHERE patient_id = ? AND doctor_id = ? AND status = 'ACTIVE'`,
+            [patientId, doctorId]
+        );
+        if (!assignment) {
+            return res.status(404).json({ error: 'Patient not found or not in your caseload' });
+        }
+
         const result = await db.queryRun(
             `UPDATE Patient_Intake SET care_status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`,
             [care_status.toUpperCase(), patientId]
@@ -293,7 +317,7 @@ router.put('/patients/:id/care-status', verifyToken, requireDoctor, async (req, 
 });
 
 // POST /api/doctor/patients/:id/care-plan - Create or update a care plan (with SOAP fields)
-router.post('/patients/:id/care-plan', verifyToken, requireDoctor, (req, res) => {
+router.post('/patients/:id/care-plan', verifyToken, requireDoctor, async (req, res) => {
     const patientId = req.params.id;
     const clinicianId = req.user.id;
     const {
@@ -301,23 +325,31 @@ router.post('/patients/:id/care-plan', verifyToken, requireDoctor, (req, res) =>
         soap_subjective, soap_objective, soap_assessment, soap_plan
     } = req.body;
 
-    const sql = `INSERT INTO Care_Plans
+    try {
+        const assignment = await db.queryGet(
+            `SELECT id FROM Patient_Doctor_Assignments WHERE patient_id = ? AND doctor_id = ? AND status = 'ACTIVE'`,
+            [patientId, clinicianId]
+        );
+        if (!assignment) {
+            return res.status(404).json({ error: 'Patient not found or not in your caseload' });
+        }
+
+        const sql = `INSERT INTO Care_Plans
         (patient_id, clinician_id, primary_diagnosis_notes, goals, recommended_interventions,
          follow_up_date, status, soap_subjective, soap_objective, soap_assessment, soap_plan)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    db.run(sql, [
-        patientId, clinicianId, primary_diagnosis_notes, goals, recommended_interventions,
-        follow_up_date, status, soap_subjective, soap_objective, soap_assessment, soap_plan
-    ], function(err) {
-        if (err) {
-            console.error('Error saving care plan:', err);
-            return res.status(500).json({ error: 'Failed to save care plan.' });
-        }
+        const result = await db.queryRun(sql, [
+            patientId, clinicianId, primary_diagnosis_notes, goals, recommended_interventions,
+            follow_up_date, status, soap_subjective, soap_objective, soap_assessment, soap_plan
+        ]);
 
-        logAuditEvent('CARE_PLAN_CREATED', patientId, clinicianId, 'CLINICIAN', { carePlanId: this.lastID });
-        res.status(201).json({ message: 'Care plan created successfully', carePlanId: this.lastID });
-    });
+        logAuditEvent('CARE_PLAN_CREATED', patientId, clinicianId, 'CLINICIAN', { carePlanId: result.lastID });
+        return res.status(201).json({ message: 'Care plan created successfully', carePlanId: result.lastID });
+    } catch (err) {
+        console.error('Error saving care plan:', err);
+        return res.status(500).json({ error: 'Failed to save care plan.' });
+    }
 });
 
 module.exports = router;
