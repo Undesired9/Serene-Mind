@@ -12,6 +12,8 @@ import LandingPage from './components/landing/LandingPage';
 import DoctorDashboard from './components/DoctorDashboard';
 import DoctorLogin from './components/DoctorLogin';
 import PatientAppointments from './components/PatientAppointments';
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
 
 const parseUser = () => {
   try {
@@ -31,6 +33,10 @@ const ProtectedRoute = ({ children }) => {
   
   if (!token || !user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user.role === 'admin') {
+    return <Navigate to="/admin" replace />;
   }
 
   if (user.role === 'doctor') {
@@ -55,6 +61,10 @@ const AssessmentRoute = ({ children }) => {
   const user = parseUser();
   
   if (!token || !user) return <Navigate to="/login" replace />;
+
+  if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+  }
   
   if (user.role === 'doctor') {
       return <Navigate to="/doctor" replace />;
@@ -74,6 +84,9 @@ const IntakeRoute = ({ children }) => {
 
   if (!token || !user) return <Navigate to="/login" replace />;
 
+  if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+  }
   if (user.role === 'doctor') {
       return <Navigate to="/doctor" replace />;
   }
@@ -89,8 +102,24 @@ const DoctorRoute = ({ children }) => {
   const user = parseUser();
   
   if (!token || !user) return <Navigate to="/login" replace />;
-  
+
+  if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+  }
   if (user.role !== 'doctor') {
+      return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
+
+// Route wrapper for admin access
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem('serene_token');
+  const user = parseUser();
+  
+  if (!token || !user) return <Navigate to="/admin-login" replace />;
+  
+  if (user.role !== 'admin') {
       return <Navigate to="/dashboard" replace />;
   }
   return children;
@@ -122,6 +151,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/doctor-login" element={<DoctorLogin />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
 
         <Route path="/intake" element={
           <IntakeRoute><PatientIntake /></IntakeRoute>
@@ -167,6 +197,12 @@ function App() {
           <DoctorRoute>
             <MainLayout><DoctorDashboard /></MainLayout>
           </DoctorRoute>
+        } />
+
+        <Route path="/admin" element={
+          <AdminRoute>
+            <MainLayout><AdminDashboard /></MainLayout>
+          </AdminRoute>
         } />
 
         {/* Landing Page */}

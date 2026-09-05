@@ -323,9 +323,12 @@ const Login = () => {
                     </button>
                 </div>
 
-                <div className="mt-4 text-center">
+                <div className="mt-4 text-center flex flex-col gap-1.5">
                     <Link to="/doctor-login" className="text-sm font-semibold text-[#1B98E0] hover:text-[#1689C9] hover:underline transition-colors">
                         Continue to the doctor portal
+                    </Link>
+                    <Link to="/admin-login" className="text-xs font-medium text-[#3D5A80] hover:text-[#0D1B2A] hover:underline transition-colors">
+                        Admin login
                     </Link>
                 </div>
             </div>

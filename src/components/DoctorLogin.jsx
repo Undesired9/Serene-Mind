@@ -311,6 +311,7 @@ const DoctorLogin = () => {
   const [touched, setTouched] = useState({});
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
 
   const validateField = (name, value) => {
     switch (name) {
@@ -431,6 +432,18 @@ const DoctorLogin = () => {
         }
       }
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
+
+      // Registration is submitted for admin approval and returns NO token.
+      // If there is no token, show a pending-approval confirmation instead of
+      // creating a session or navigating to the dashboard.
+      if (!data.token) {
+        if (isRegister) {
+          setRegistrationPending(true);
+          return;
+        }
+        throw new Error(data.error || 'No session token returned');
+      }
+
       localStorage.setItem('serene_token', data.token);
       localStorage.setItem('serene_user', JSON.stringify(data.user));
       navigate('/doctor');
@@ -446,6 +459,7 @@ const DoctorLogin = () => {
     setFieldErrors({});
     setTouched({});
     setServerError('');
+    setRegistrationPending(false);
     setFormData({
       fullName: '', username: '', email: '', identifier: '',
       password: '', confirmPassword: '', specialization: '', licenseNumber: '',
@@ -496,34 +510,61 @@ const DoctorLogin = () => {
             <p style={styles.subtitle}>Secure access for healthcare professionals</p>
           </div>
 
-          {/* Tabs */}
-          <div style={styles.tabRow}>
-            <button
-              type="button"
-              onClick={switchMode}
-              style={{ ...styles.tab, ...(!isRegister ? styles.tabActive : {}) }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={switchMode}
-              style={{ ...styles.tab, ...(isRegister ? styles.tabActive : {}) }}
-            >
-              Register
-            </button>
-          </div>
-
-          {/* Server Error */}
-          {serverError && (
-            <div style={{ ...styles.error, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', fontSize: '13px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-              {serverError}
+          {/* Pending approval confirmation */}
+          {registrationPending ? (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: 'linear-gradient(135deg, #0E7C7B, #1B98E0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', boxShadow: '0 10px 30px rgba(14,124,123,0.45)' }}>
+                {/* Shield check icon */}
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                  <polyline points="9 12 11 14 15 10"/>
+                </svg>
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: '0 0 10px 0' }}>
+                Registration submitted
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: '0 0 28px 0' }}>
+                Your account is pending admin approval. You'll be able to sign in once approved.
+              </p>
+              <button
+                type="button"
+                className="doc-btn"
+                onClick={() => { setRegistrationPending(false); setIsRegister(false); }}
+                style={{ ...styles.btn, width: '100%' }}
+              >
+                Back to sign in
+              </button>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Tabs */}
+              <div style={styles.tabRow}>
+                <button
+                  type="button"
+                  onClick={switchMode}
+                  style={{ ...styles.tab, ...(!isRegister ? styles.tabActive : {}) }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={switchMode}
+                  style={{ ...styles.tab, ...(isRegister ? styles.tabActive : {}) }}
+                >
+                  Register
+                </button>
+              </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} style={styles.form} noValidate>
+              {/* Server Error */}
+              {serverError && (
+                <div style={{ ...styles.error, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', fontSize: '13px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ flexShrink: 0 }}><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {serverError}
+                </div>
+              )}
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} style={styles.form} noValidate>
 
             {isRegister && (
               <div style={styles.field}>
@@ -764,6 +805,8 @@ const DoctorLogin = () => {
               {isRegister ? 'Sign In' : 'Register'}
             </button>
           </div>
+            </>
+          )}
         </div>
 
         {/* Secure badge */}
